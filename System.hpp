@@ -36,11 +36,17 @@ class System {
         void simulation(); //also trigger event
         void performance();
 
+        void arriveAtStop(Event* e);
+        void deptFromStop(Event* e);
+        void arriveAtLight(Event* e);
+        void deptFromLight(Event* e);
+        void paxArriveAtStop(Event* e);
+
     private:
         vector<Bus*> fleet;
         priority_queue<Event*, vector<Event*>, eventCmp> eventList;
         vector<variant<Stop*, Light*>> route;
-        map<int, function<void(Event)>> eventSet;
+        map<int, function<void(Event*)>> eventSet;
         int headway;
         
 };

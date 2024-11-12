@@ -14,10 +14,10 @@ class Bus {
         int getLoaction();
         int getDwell();
 
-        void setVol();
-        void setPax();
-        void setLocation();
-        void setDwell();
+        void setVol(int v);
+        void setPax(int p);
+        void setLocation(int l);
+        void setDwell(int d);
 
     private:
         int id;

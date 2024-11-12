@@ -1,7 +1,8 @@
 #include<bits/stdc++.h>
+#include "System.hpp"
 
 using namespace std;
 
 int main() {
-    cout << "test";
+    System system;
 }
