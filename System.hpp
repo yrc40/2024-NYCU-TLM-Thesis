@@ -9,13 +9,9 @@ using namespace std;
 
 enum TrafficLight { RED, YELLOW, GREEN };
 
-struct eventCmp {
-    bool operator()(Event* a, Event* b) { return a->getTime() > b->getTime(); }
-};
-
 struct Light {
     int id;
-    int location;
+    int mileage;
     TrafficLight state = GREEN;
     int cycleTime;
     int red;
@@ -25,13 +21,28 @@ struct Light {
 
 struct Stop {
     int id;
-    int location;
+    string stopName;
+    int mileage;
     int pax;
+    string note;
+};
+
+struct eventCmp {
+    bool operator()(Event* a, Event* b) { return a->getTime() > b->getTime(); }
+};
+
+struct mileageCmp {
+    bool operator()(const variant<Stop*, Light*>& a, const variant<Stop*, Light*>& b) const {
+        return visit([](const auto* obj1, const auto* obj2) {
+            return obj1->mileage > obj2->mileage; 
+        }, a, b);
+    }
 };
 
 class System {
     public:
         System();
+        System(string routeName);
         void init(); //also setup event
         void simulation(); //also trigger event
         void performance();
@@ -45,9 +56,10 @@ class System {
     private:
         vector<Bus*> fleet;
         priority_queue<Event*, vector<Event*>, eventCmp> eventList;
-        vector<variant<Stop*, Light*>> route;
+        priority_queue<variant<Stop*, Light*>, vector<variant<Stop*, Light*>>, mileageCmp> route; //decltype
         map<int, function<void(Event*)>> eventSet;
         int headway;
+        string routeName;
         
 };
 

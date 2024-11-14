@@ -4,5 +4,8 @@
 using namespace std;
 
 int main() {
-    System system;
+    System system("307g");
+    system.init();
+    //system.simulation();
+    //system.performance();
 }
