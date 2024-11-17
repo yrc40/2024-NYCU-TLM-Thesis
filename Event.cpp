@@ -6,8 +6,12 @@ Event::Event(int time, int busID, int eventType, int oneOfID, bool direction)
         lightID = oneOfID;
 }
 
-int Event::getEventType() { return eventType; }
+const int Event::getEventType() { return eventType; }
 
-int Event::getTime() { return time; }
+const int Event::getTime() { return time; }
 
-int Event::getBusID() { return busID; }
+const int Event::getBusID() { return busID; }
+
+const int Event::getStopID() { return stopID; }
+
+const bool Event::getDirection() { return direction; }

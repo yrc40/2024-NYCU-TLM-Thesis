@@ -13,6 +13,7 @@ class Bus {
         int getPax();
         int getLoaction();
         int getDwell();
+        const int getCapacity();
 
         void setVol(int v);
         void setPax(int p);

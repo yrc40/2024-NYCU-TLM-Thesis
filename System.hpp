@@ -21,6 +21,7 @@ struct Light {
 
 struct Stop {
     int id;
+    bool direction;
     string stopName;
     int mileage;
     int pax;
@@ -55,11 +56,12 @@ class System {
 
     private:
         vector<Bus*> fleet;
+        string routeName;
         priority_queue<Event*, vector<Event*>, eventCmp> eventList;
-        priority_queue<variant<Stop*, Light*>, vector<variant<Stop*, Light*>>, mileageCmp> route; //decltype
+        priority_queue<variant<Stop*, Light*>, vector<variant<Stop*, Light*>>, mileageCmp> route;
+        vector<variant<Stop*, Light*>> route2;
         map<int, function<void(Event*)>> eventSet;
         int headway;
-        string routeName;
         
 };
 

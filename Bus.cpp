@@ -12,6 +12,8 @@ int Bus::getLoaction() { return location; }
 
 int Bus::getDwell() { return dwell; }
 
+const int Bus::getCapacity() { return capacity; }
+
 void Bus::setVol(int v) { this->vol = v; }
 
 void Bus::setPax(int p) { this->pax = p; }
