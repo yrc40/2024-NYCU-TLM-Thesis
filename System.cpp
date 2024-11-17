@@ -44,7 +44,6 @@ void System::init() {
         std::getline(ss, field, ',');
         stop->mileage = std::stoi(field);
         stop->pax = 0; 
-    
 
         route.push(stop);
 
@@ -62,7 +61,8 @@ void System::init() {
 }
 
 void System::arriveAtStop(Event* e) {
-    
+
+
     /*assume drop rate is 0.5*/
     float dropRate = 0.5;
 
@@ -95,6 +95,8 @@ void System::arriveAtStop(Event* e) {
         cout << "Error: Stop not found for ID " << stopID << endl;
         return;
     }
+
+    bus->setLocation(stop->mileage);
     
     int availableCapacity = static_cast<int>(bus->getCapacity() - bus->getPax() * dropRate);  
     int demand = stop->pax; 
@@ -119,7 +121,9 @@ void System::arriveAtStop(Event* e) {
 }
 
 void System::deptFromStop(Event* e) {
-    
+    /*Calculate scheme*/
+
+    /*Find next event*/
 }
 
 void System::arriveAtLight(Event* e) {
