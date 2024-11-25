@@ -45,19 +45,13 @@ void System::init() {
         stop->mileage = std::stoi(field);
         stop->pax = 0; 
 
-        route.push(stop);
+        route.insert(stop);
 
         cout << stop->id << " " << stop->direction << " " << stop->stopName << " " << stop->mileage << "\n";
     }
 
-    file.close();
+    file.close(); 
 
-    priority_queue<variant<Stop*, Light*>, vector<variant<Stop*, Light*>>, mileageCmp> pq_copy = route; 
-
-    while (!pq_copy.empty()) {
-        route2.push_back(pq_copy.top());
-        pq_copy.pop();
-    }
 }
 
 void System::arriveAtStop(Event* e) {
@@ -82,16 +76,16 @@ void System::arriveAtStop(Event* e) {
     
     int stopID = e->getStopID(); 
     Stop* stop = nullptr;
-    for (auto& item : route2) {
+    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
         if (auto* s = get_if<Stop*>(&item)) {
-            if ((*s)->id == stopID) {
-                stop = *s;
-                break;
-            }
+            return (*s)->id == stopID;
         }
-    }
+        return false;
+    });
 
-    if (!stop) {
+    if (it != route.end()) {
+        stop = get<Stop*>(*it);
+    } else {
         cout << "Error: Stop not found for ID " << stopID << endl;
         return;
     }

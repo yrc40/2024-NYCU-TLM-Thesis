@@ -58,8 +58,7 @@ class System {
         vector<Bus*> fleet;
         string routeName;
         priority_queue<Event*, vector<Event*>, eventCmp> eventList;
-        priority_queue<variant<Stop*, Light*>, vector<variant<Stop*, Light*>>, mileageCmp> route;
-        vector<variant<Stop*, Light*>> route2;
+        set<variant<Stop*, Light*>, mileageCmp> route;
         map<int, function<void(Event*)>> eventSet;
         int headway;
         
