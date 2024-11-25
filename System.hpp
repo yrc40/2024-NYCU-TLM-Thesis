@@ -26,6 +26,7 @@ struct Stop {
     int mileage;
     int pax;
     string note;
+    int lastArrive;
 };
 
 struct eventCmp {
@@ -54,13 +55,33 @@ class System {
         void deptFromLight(Event* e);
         void paxArriveAtStop(Event* e);
 
+        /*Func*/
+        void incrHeadwayDev(int dev);
+        optional<Stop*> getNextStop(int stopID);
+
+        /*getter*/
+        const int getTmax();
+
     private:
-        vector<Bus*> fleet;
+        /*Paramemter*/
         string routeName;
+        int Tmax = 3 * 60;
+        int Vavg = 40;
+        int Vlimit = 50;
+        int Vlow = 15;
+
+        /*Variable*/
+        int headwayDev;
+
+        /*Data Structure*/
+        vector<Bus*> fleet;
         priority_queue<Event*, vector<Event*>, eventCmp> eventList;
         set<variant<Stop*, Light*>, mileageCmp> route;
         map<int, function<void(Event*)>> eventSet;
-        int headway;
+
+        /*Function*/
+        optional<Stop*> findNextStop(int stopID);
+        optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target);
         
 };
 

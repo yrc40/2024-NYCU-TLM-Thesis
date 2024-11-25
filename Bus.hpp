@@ -7,18 +7,21 @@ using namespace std;
 
 class Bus {
     public:
-        Bus(int id);
+        Bus(int id, int headway);
         int getId();
         int getVol();
         int getPax();
         int getLoaction();
         int getDwell();
+        int getLastStop();
         const int getCapacity();
+        const int getHeadway();
 
         void setVol(int v);
         void setPax(int p);
         void setLocation(int l);
         void setDwell(int d);
+        void setLastStop(int t);
 
     private:
         int id;
@@ -27,6 +30,8 @@ class Bus {
         int pax;
         int location;
         int dwell;
+        int headway;
+        int lastStop = 0;
 };
 
 #endif
