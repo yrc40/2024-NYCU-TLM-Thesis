@@ -1,5 +1,6 @@
 a.out
 bus
 env
-.vscode
+.vscode/
 result.txt
+data/

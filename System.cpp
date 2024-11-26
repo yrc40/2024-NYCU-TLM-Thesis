@@ -179,22 +179,38 @@ void System::arriveAtStop(Event* e) {
     stop->pax -= boardPax;
     cout << "Capacity: " << bus->getCapacity() << ", Current Volume: " << bus->getVol() << ", Boarded Pax: " << boardPax << endl;
 
-    /*New event*/
-    Event* newEvent = new Event( //depart form stop
-        e->getTime() + min(this->getTmax(), bus->getDwell()), 
-        bus->getId(),
-        2, 
-        e->getStopID(), 
-        e->getDirection()
-    );
-
-    this->incrHeadwayDev(pow(((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway(), 2)); //headway deviation
-    cout << "Cumulative headway deviation" << headwayDev << "\n";
+    Bus* prevBus = nullptr; // Get distance from proceed bus
+    for (auto& b : fleet) {
+        if (b->getId() == busID - 1) {
+            prevBus = b;
+            break;
+        }
+    }
+    if (prevBus) {
+        this->incrHeadwayDev(pow(((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway(), 2)); //headway deviation
+        cout << "Cumulative headway deviation" << headwayDev << "\n";
+    } //000000000000000000000000
+    
     stop->lastArrive = e->getTime();
 
-    eventList.push(newEvent);
-
     bus->setDwell(bus->getDwell() - min(this->getTmax(), bus->getDwell()));
+
+    /*New event*/
+    auto itor = route.find(stop);
+    if (itor != route.end() && itor == prev(route.end())) {
+        cout << "Final stop in this route, terminate\n";
+        return;   
+    } else {
+        cout << "Going to next element ...\n";
+        Event* newEvent = new Event( //depart form stop
+            e->getTime() + min(this->getTmax(), bus->getDwell()), 
+            bus->getId(),
+            2, 
+            e->getStopID(), 
+            e->getDirection()
+        );
+        eventList.push(newEvent); 
+    }
 
     cout << "\n";
 }
