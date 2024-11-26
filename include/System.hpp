@@ -36,7 +36,7 @@ struct eventCmp {
 struct mileageCmp {
     bool operator()(const variant<Stop*, Light*>& a, const variant<Stop*, Light*>& b) const {
         return visit([](const auto* obj1, const auto* obj2) {
-            return obj1->mileage > obj2->mileage; 
+            return obj1->mileage < obj2->mileage; 
         }, a, b);
     }
 };
@@ -66,12 +66,12 @@ class System {
         /*Paramemter*/
         string routeName;
         int Tmax = 3 * 60;
-        int Vavg = 40;
-        int Vlimit = 50;
-        int Vlow = 15;
+        float Vavg = 40 / 3.6;
+        float Vlimit = 50 / 3.6;
+        float Vlow = 15 / 3.6;
 
         /*Variable*/
-        int headwayDev;
+        int headwayDev = 0;
 
         /*Data Structure*/
         vector<Bus*> fleet;

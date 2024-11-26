@@ -4,7 +4,7 @@ Bus::Bus(int id, int headway) : id(id), headway(headway) {}
 
 int Bus::getId() { return id; }
 
-int Bus::getVol() { return vol; }
+float Bus::getVol() { return vol; }
 
 int Bus::getPax() { return pax; }
 
@@ -16,7 +16,7 @@ const int Bus::getCapacity() { return capacity; }
 
 const int Bus::getHeadway() { return headway; }
 
-void Bus::setVol(int v) { this->vol = v; }
+void Bus::setVol(float v) { this->vol = v; }
 
 void Bus::setPax(int p) { this->pax = p; }
 

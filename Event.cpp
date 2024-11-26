@@ -3,7 +3,7 @@
 Event::Event(int time, int busID, int eventType, int oneOfID, bool direction)
     : time(time), busID(busID), eventType(eventType), direction(direction) {
         /* tmp assumption */
-        lightID = oneOfID;
+        stopID = oneOfID;
 }
 
 const int Event::getEventType() { return eventType; }

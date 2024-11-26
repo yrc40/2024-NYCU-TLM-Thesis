@@ -9,7 +9,7 @@ class Bus {
     public:
         Bus(int id, int headway);
         int getId();
-        int getVol();
+        float getVol();
         int getPax();
         int getLoaction();
         int getDwell();
@@ -17,7 +17,7 @@ class Bus {
         const int getCapacity();
         const int getHeadway();
 
-        void setVol(int v);
+        void setVol(float v);
         void setPax(int p);
         void setLocation(int l);
         void setDwell(int d);
@@ -26,10 +26,10 @@ class Bus {
     private:
         int id;
         const int capacity = 60;
-        int vol;
-        int pax;
+        float vol = 0;
+        int pax = 0;
         int location;
-        int dwell;
+        int dwell = 0;
         int headway;
         int lastStop = 0;
 };
