@@ -27,8 +27,8 @@ class Bus {
         int id;
         const int capacity = 60;
         float vol = 0;
-        int pax = 0;
-        int location;
+        int pax = 10;
+        int location = 0;
         int dwell = 0;
         int headway;
         int lastStop = 0;

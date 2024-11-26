@@ -132,6 +132,7 @@ void System::arriveAtStop(Event* e) {
 
     /*assume drop rate is 0.5*/
     float dropRate = 0.5;
+    float arriveRate = 0.5;
 
     int busID = e->getBusID();
     Bus* bus = nullptr;
@@ -141,6 +142,7 @@ void System::arriveAtStop(Event* e) {
             break;
         }
     }
+    cout << "dwell time = " << bus->getDwell() << "\n";
     
     if (!bus) {
         cout << "Error: Bus not found for ID " << busID << endl;
@@ -171,13 +173,16 @@ void System::arriveAtStop(Event* e) {
     bus->setLocation(stop->mileage);
 
     /*Deal with pax*/
-    int availableCapacity = static_cast<int>(bus->getCapacity() - bus->getPax() * dropRate);  
-    int demand = stop->pax; 
+    int paxRemain = static_cast<int>(bus->getPax() * dropRate);
+    int availableCapacity = static_cast<int>(bus->getCapacity() - paxRemain);
+    cout << "availableCapacity: " << availableCapacity << "\n";
+    int demand = stop->pax + static_cast<int>((e->getTime() - stop->lastArrive) * arriveRate); 
+    cout << "Demand: " << demand << "\n";
     int boardPax = (demand > availableCapacity) ? availableCapacity : demand;
 
-    bus->setPax(availableCapacity + boardPax);    
+    bus->setPax(paxRemain + boardPax);    
     stop->pax -= boardPax;
-    cout << "Capacity: " << bus->getCapacity() << ", Current Volume: " << bus->getVol() << ", Boarded Pax: " << boardPax << endl;
+    cout << "Capacity: " << bus->getCapacity() << ", Current Passenger: " << bus->getPax() << ", Boarded Passenger: " << boardPax << endl;
 
     Bus* prevBus = nullptr; // Get distance from proceed bus
     for (auto& b : fleet) {
@@ -189,11 +194,9 @@ void System::arriveAtStop(Event* e) {
     if (prevBus) {
         this->incrHeadwayDev(pow(((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway(), 2)); //headway deviation
         cout << "Cumulative headway deviation" << headwayDev << "\n";
-    } //000000000000000000000000
+    }
     
     stop->lastArrive = e->getTime();
-
-    bus->setDwell(bus->getDwell() - min(this->getTmax(), bus->getDwell()));
 
     /*New event*/
     auto itor = route.find(stop);
@@ -211,7 +214,7 @@ void System::arriveAtStop(Event* e) {
         );
         eventList.push(newEvent); 
     }
-
+    bus->setDwell(bus->getDwell() - min(this->getTmax(), bus->getDwell()));
     cout << "\n";
 }
 
@@ -261,7 +264,7 @@ void System::deptFromStop(Event* e) {
         int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - bus->getPax() * dropRate)); //pax num
         int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7 * tan(bus->getPax() * (1 - dropRate) / bus->getCapacity())));
         int totaldwell = paxTime + bus->getDwell();
-  
+        cout << "total dwell time = " << totaldwell << "\n";
         
         Bus* prevBus = nullptr; // Get distance from proceed bus
         for (auto& b : fleet) {
@@ -317,15 +320,12 @@ void System::deptFromStop(Event* e) {
 
     /*Find next event*/
     auto nextElement = findNext(stop);
-    if (!nextElement.has_value()) cout << "00000000000\n";
     if(nextElement.has_value()) {
         visit([&](auto* obj) {
             using T = decay_t<decltype(*obj)>;
             if constexpr (is_same_v<T, Stop>) {
-                cout << "Next Stop ID: " << obj->id << endl;
                 int dist =  obj->mileage - stop->mileage;
                 int newTime = e->getTime() + dist / bus->getVol();
-                cout << "New Time:" << newTime << "\n";
                 Event* newEvent = new Event( //arrive at stop
                     newTime, 
                     bus->getId(),
@@ -356,14 +356,95 @@ void System::deptFromStop(Event* e) {
 }
 
 void System::arriveAtLight(Event* e) {
+
+    /*Find target*/
+    int busID = e->getBusID();
+    Bus* bus = nullptr;
+    for (auto& b : fleet) {
+        if (b->getId() == busID) {
+            bus = b;
+            break;
+        }
+    }
+    
+    if (!bus) {
+        cout << "Error: Bus not found for ID " << busID << endl;
+        return;
+    }
+    
+    int lightID = e->getLightID();
+    Light* light = nullptr;
+    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
+        if (auto* l = get_if<Light*>(&item)) {
+                return true;
+        }
+        return false;
+    });
+
+    if (it != route.end()) {
+        light = get<Light*>(*it);
+    } else {
+        cout << "Error: Stop not found for ID " << lightID << endl;
+        return;
+    }
+
+    /*Update light status*/
+    int remainder = (e->getTime() - light->offset) % light->cycleTime;
+    if (remainder >= light->green) {
+        light->state = RED;
+    } else {
+        light->state = GREEN;
+    }
+
+    /*New Event*/
+    if (light->state == GREEN) {
+        auto nextElement = findNext(light);
+        if(nextElement.has_value()) {
+            visit([&](auto* obj) {
+                using T = decay_t<decltype(*obj)>;
+                if constexpr (is_same_v<T, Stop>) {
+                    int dist =  obj->mileage - light->mileage;
+                    int newTime = e->getTime() + dist / bus->getVol();
+                    Event* newEvent = new Event( //arrive at stop
+                        newTime, 
+                        bus->getId(),
+                        1, 
+                        obj->id, 
+                        e->getDirection()
+                    );
+                    eventList.push(newEvent);
+
+                } else if constexpr (is_same_v<T, Light>) {
+                    cout << "Next Light ID: " << obj->id << endl;
+                    int dist = light->mileage - obj->mileage;
+                    int newTime = e->getTime() + dist / bus->getVol();
+                    Event* newEvent = new Event( //arrive at light
+                        newTime, 
+                        bus->getId(),
+                        3, 
+                        obj->id, 
+                        e->getDirection()
+                    );
+                    eventList.push(newEvent);
+                }
+            }, nextElement.value());
+        } else {
+            cout << "Can't find next element or no next\n";
+        }
+    } else {
+        Event* newEvent = new Event( //dept form light
+            e->getTime() + (light->cycleTime - remainder), 
+            bus->getId(),
+            4, 
+            lightID, 
+            e->getDirection()
+        );
+        eventList.push(newEvent);
+    }
     
 }
 
 void System::deptFromLight(Event* e) {
-   
-}
-
-void System::paxArriveAtStop(Event* e) {
    
 }
 
@@ -376,35 +457,6 @@ void System::simulation() {
         0
     );
     eventList.push(newEvent);
-    /*Event* currentEvent = eventList.top();
-    cout << "curr " << "busID:" << currentEvent->getBusID() << "\n"
-        << "stopID " << currentEvent->getStopID() << "\n";
-
-    int stopID = currentEvent->getStopID();
-    Stop* stop = nullptr;
-    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-    if (auto* s = get_if<Stop*>(&item)) {
-        // 比較 stopID，找出對應的 Stop
-        if ((*s)->id == stopID) {
-            stop = *s;
-            return true;
-        }
-    }
-        return false;
-    });
-
-    cout << "fordebug: " << stop->id <<"Name " << stop->stopName << endl;
-    auto nextstop = findNext(stop);
-    if (nextstop.has_value()) {  // 確認 nextstop 是否有值
-    // 判斷下一個停靠點是 Stop* 還是 Light*
-    if (auto stopPtr = std::get_if<Stop*>(&(*nextstop))) {
-        cout << "Next stop is a Stop at address: " << (*stopPtr)->id << endl;
-    } else if (auto lightPtr = std::get_if<Light*>(&(*nextstop))) {
-        cout << "Next stop is a Light at address: " << *lightPtr << endl;
-    }
-} else {
-    cout << "No next stop found." << endl;
-}*/
 
     while(!eventList.empty()) {
         Event* currentEvent = eventList.top();

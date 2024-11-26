@@ -14,4 +14,6 @@ const int Event::getBusID() { return busID; }
 
 const int Event::getStopID() { return stopID; }
 
+const int Event::getLightID() { return lightID; }
+
 const bool Event::getDirection() { return direction; }

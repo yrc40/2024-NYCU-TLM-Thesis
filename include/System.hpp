@@ -17,6 +17,7 @@ struct Light {
     int red;
     int green;
     int yellow;
+    int offset;
 };
 
 struct Stop {

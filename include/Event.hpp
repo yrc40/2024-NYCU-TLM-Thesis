@@ -9,6 +9,7 @@ class Event {
         const int getBusID();
         const int getStopID();
         const bool getDirection();
+        const int getLightID();
 
     private:
         int time;
