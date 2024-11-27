@@ -24,6 +24,6 @@ void Bus::setLocation(int l) { this->location = l; }
 
 void Bus::setDwell(int d) { this-> dwell = d; }
 
-int Bus::getLastStop() { return lastStop; }
+int Bus::getLastGo() { return lastGo; }
 
-void Bus::setLastStop(int t) { this->lastStop = t; }
+void Bus::setLastGo(int t) { this->lastGo = t; }

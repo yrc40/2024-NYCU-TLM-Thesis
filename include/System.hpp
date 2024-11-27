@@ -23,9 +23,9 @@ struct Stop {
     bool direction;
     string stopName;
     int mileage;
-    int pax;
+    int pax = 0;
     string note;
-    int lastArrive;
+    int lastArrive = -1;
 };
 
 struct eventCmp {

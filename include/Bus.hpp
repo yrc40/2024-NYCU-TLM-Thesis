@@ -13,7 +13,7 @@ class Bus {
         int getPax();
         int getLoaction();
         int getDwell();
-        int getLastStop();
+        int getLastGo();
         const int getCapacity();
         const int getHeadway();
 
@@ -21,7 +21,7 @@ class Bus {
         void setPax(int p);
         void setLocation(int l);
         void setDwell(int d);
-        void setLastStop(int t);
+        void setLastGo(int t);
 
     private:
         int id;
@@ -31,7 +31,7 @@ class Bus {
         int location = 0;
         int dwell = 0;
         int headway;
-        int lastStop = 0;
+        int lastGo = 0;
 };
 
 #endif

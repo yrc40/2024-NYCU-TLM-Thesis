@@ -7,5 +7,5 @@ int main() {
     System system("307g");
     system.init();
     system.simulation();
-    //system.performance();
+    system.performance();
 }
