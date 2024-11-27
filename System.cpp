@@ -7,7 +7,6 @@ System::System(string routeName) : routeName(routeName), route(mileageCmp()) {
     eventSet[2] = [this](Event* e) { this->deptFromStop(e); };
     eventSet[3] = [this](Event* e) { this->arriveAtLight(e); };
     eventSet[4] = [this](Event* e) { this->deptFromLight(e); };
-    eventSet[5] = [this](Event* e) { this->paxArriveAtStop(e); };
 }
 
 const int System::getTmax() { return Tmax; }
@@ -42,25 +41,12 @@ optional<variant<Stop*, Light*>> System::findNext(variant<Stop*, Light*> target)
     it++;
     if (std::holds_alternative<Stop*>(*it)) {
         Stop* stop = std::get<Stop*>(*it);
-        cout << "!!!!!!!!!!Stop ID: " << stop->id << endl;
+        cout << "Find Next Stop ID: " << stop->id << endl;
     } else if (std::holds_alternative<Light*>(*it)) {
         Light* light = std::get<Light*>(*it);
-        cout << "Light ID: " << light->id << endl;  // 假設 Light 有 getId()   
+        cout << "Find Next Light ID: " << light->id << endl;  
     }   
     return *it;
-    /*if (it == this->route.end()) { 
-        cout << "2222222\n";
-        return nullopt;
-    }
-
-    it++;  
-    if (it == this->route.end()) { 
-        cout << "2222222\n";
-        return nullopt;
-    }
-
-    return *it;
-    cout << static_cast<int>(*it);*/
 
 }
 
@@ -109,8 +95,21 @@ void System::init() {
     }
 
     file.close(); 
+    Light* light = new Light;
 
-    /*for (const auto& element : route) {
+    // 初始化成員變數
+    light->id = 1;
+    light->mileage = 750;
+    light->state = RED; // 修改預設狀態
+    light->cycleTime = 60;
+    light->offset = 10;
+
+    light->plan.push_back({0, GREEN});
+    light->plan.push_back({20, YELLOW});
+    light->plan.push_back({30, RED});
+
+    route.insert(light);
+    for (const auto& element : route) {
         visit([](auto&& obj) {
             using T = decay_t<decltype(obj)>;
             if constexpr (is_same_v<T, Stop*>) {
@@ -119,7 +118,7 @@ void System::init() {
                 cout << "Light ID: " << obj->id << endl;
             }
         }, element);
-    }*/
+    }
 
     Bus* newBus = new Bus(0, 5);
     fleet.push_back(newBus);
@@ -337,7 +336,7 @@ void System::deptFromStop(Event* e) {
 
             } else if constexpr (is_same_v<T, Light>) {
                 cout << "Next Light ID: " << obj->id << endl;
-                int dist = stop->mileage - obj->mileage;
+                int dist = obj->mileage - stop->mileage;
                 int newTime = e->getTime() + dist / bus->getVol();
                 Event* newEvent = new Event( //arrive at light
                     newTime, 
@@ -356,6 +355,9 @@ void System::deptFromStop(Event* e) {
 }
 
 void System::arriveAtLight(Event* e) {
+    /*Announcement*/
+    cout << "Time: " << e->getTime() << "\n";
+    cout << "Bus " << e->getBusID() << " arrive at light " << e->getLightID() << "\n";
 
     /*Find target*/
     int busID = e->getBusID();
@@ -390,14 +392,17 @@ void System::arriveAtLight(Event* e) {
 
     /*Update light status*/
     int remainder = (e->getTime() - light->offset) % light->cycleTime;
-    if (remainder >= light->green) {
-        light->state = RED;
-    } else {
-        light->state = GREEN;
+    int wait = 0;
+    for (auto it = light->plan.begin(); it != light->plan.end() - 1; it++) {
+        if (remainder >= it->first && remainder < (it + 1)->first) {
+            light->state =  it->second;
+            wait = (it + 1)->first - remainder;
+        }
     }
 
     /*New Event*/
     if (light->state == GREEN) {
+        cout << "Now is GREEN, just go through...\n";
         auto nextElement = findNext(light);
         if(nextElement.has_value()) {
             visit([&](auto* obj) {
@@ -416,7 +421,7 @@ void System::arriveAtLight(Event* e) {
 
                 } else if constexpr (is_same_v<T, Light>) {
                     cout << "Next Light ID: " << obj->id << endl;
-                    int dist = light->mileage - obj->mileage;
+                    int dist = obj->mileage - light->mileage;
                     int newTime = e->getTime() + dist / bus->getVol();
                     Event* newEvent = new Event( //arrive at light
                         newTime, 
@@ -432,8 +437,9 @@ void System::arriveAtLight(Event* e) {
             cout << "Can't find next element or no next\n";
         }
     } else {
+        cout << "Now is RED, wait for " << wait << " second...\n";
         Event* newEvent = new Event( //dept form light
-            e->getTime() + (light->cycleTime - remainder), 
+            e->getTime() + wait, 
             bus->getId(),
             4, 
             lightID, 
@@ -445,8 +451,77 @@ void System::arriveAtLight(Event* e) {
 }
 
 void System::deptFromLight(Event* e) {
-   
-}
+    /*Announcement*/
+    cout << "Time: " << e->getTime() << "\n";
+    cout << "Bus " << e->getBusID() << " dept form light " << e->getLightID() << "\n";
+
+    /*Find target*/
+    int busID = e->getBusID();
+    Bus* bus = nullptr;
+    for (auto& b : fleet) {
+        if (b->getId() == busID) {
+            bus = b;
+            break;
+        }
+    }
+    
+    if (!bus) {
+        cout << "Error: Bus not found for ID " << busID << endl;
+        return;
+    }
+    
+    int lightID = e->getLightID();
+    Light* light = nullptr;
+    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
+        if (auto* l = get_if<Light*>(&item)) {
+                return true;
+        }
+        return false;
+    });
+
+    if (it != route.end()) {
+        light = get<Light*>(*it);
+    } else {
+        cout << "Error: Stop not found for ID " << lightID << endl;
+        return;
+    }
+
+    /*New event*/
+    auto nextElement = findNext(light);
+    if(nextElement.has_value()) {
+        visit([&](auto* obj) {
+            using T = decay_t<decltype(*obj)>;
+            if constexpr (is_same_v<T, Stop>) {
+                int dist =  obj->mileage - light->mileage;
+                int newTime = e->getTime() + dist / bus->getVol();
+                Event* newEvent = new Event( //arrive at stop
+                    newTime, 
+                    bus->getId(),
+                    1, 
+                    obj->id, 
+                    e->getDirection()
+                );
+                eventList.push(newEvent);
+
+            } else if constexpr (is_same_v<T, Light>) {
+                cout << "Next Light ID: " << obj->id << endl;
+                int dist = obj->mileage - light->mileage;
+                int newTime = e->getTime() + dist / bus->getVol();
+                Event* newEvent = new Event( //arrive at light
+                    newTime, 
+                    bus->getId(),
+                    3, 
+                    obj->id, 
+                    e->getDirection()
+                );
+                eventList.push(newEvent);
+            }
+        }, nextElement.value());
+    } else {
+        cout << "Can't find next element or no next\n";
+    }
+}  
+
 
 void System::simulation() {
     Event* newEvent = new Event( //arrive at light
@@ -460,7 +535,7 @@ void System::simulation() {
 
     while(!eventList.empty()) {
         Event* currentEvent = eventList.top();
-
+        cout << eventList.size() << "\n";
         int eventType = currentEvent->getEventType();
         auto it = eventSet.find(eventType);
         if (it != eventSet.end()) {
@@ -468,9 +543,8 @@ void System::simulation() {
         } else {
             cout << "Unknown event type: " << eventType << endl;
         }
-        // cout << eventList.size() << '\n';
         eventList.pop();
-        // cout << eventList.size() << '\n';
+        cout << eventList.size() << "\n";
     }
 
 

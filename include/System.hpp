@@ -14,9 +14,7 @@ struct Light {
     int mileage;
     TrafficLight state = GREEN;
     int cycleTime;
-    int red;
-    int green;
-    int yellow;
+    vector<pair<int, TrafficLight>> plan;
     int offset;
 };
 
