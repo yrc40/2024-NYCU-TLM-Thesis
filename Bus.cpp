@@ -8,7 +8,7 @@ float Bus::getVol() { return vol; }
 
 int Bus::getPax() { return pax; }
 
-int Bus::getLoaction() { return location; }
+int Bus::getLocation() { return location; }
 
 int Bus::getDwell() { return dwell; }
 

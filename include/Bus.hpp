@@ -11,7 +11,7 @@ class Bus {
         int getId();
         float getVol();
         int getPax();
-        int getLoaction();
+        int getLocation();
         int getDwell();
         int getLastGo();
         const int getCapacity();

@@ -236,10 +236,12 @@ void System::readSche(int trial) {
 }
 
 void System::arriveAtStop(Event* e) {
-    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
+    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
+        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
+        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
     cout << "New Event: Bus " << e->getBusID() << " arrive at stop " << e->getStopID() << "\n";
 
-    /*assume drop rate is 0.5*/
+    /*Get arrive rate and drop rate*/
     float arriveRate = getOn[(e->getStopID()) - 1][0];
     float dropRate = getOff[(e->getStopID()) - 1][0];
 
@@ -280,6 +282,9 @@ void System::arriveAtStop(Event* e) {
     /*Update vol and location*/
     bus->setVol(0);
     bus->setLocation(stop->mileage);
+    sort(fleet.begin(), fleet.end(), [](Bus* a, Bus* b) {
+        return a->getLocation() > b->getLocation(); 
+    });
 
     /*Deal with pax*/
     int paxRemain;
@@ -306,13 +311,18 @@ void System::arriveAtStop(Event* e) {
     stop->pax -= boardPax;
     cout << "Capacity: " << bus->getCapacity() << ", Current Passenger: " << bus->getPax() << ", Boarded Passenger: " << boardPax << endl;
 
-    Bus* prevBus = nullptr; // Get distance from proceed bus
-    for (auto& b : fleet) {
-        if (b->getId() == busID - 1) {
-            prevBus = b;
-            break;
+    Bus* prevBus = nullptr;
+    for (auto it = fleet.begin(); it != fleet.end(); ++it) {
+        if ((*it)->getId() == busID) {
+            if (it != fleet.begin()) {
+                prevBus = *(it - 1); 
+            } else {
+                break;
+            }
         }
     }
+
+    // Get distance from proceed bus
     if (prevBus) {
         cout << " Time: " << e->getTime() << " last arr " << stop->lastArrive << " hdwy " << bus->getHeadway() << "\n";
         cout << ((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway() << endl;
@@ -343,7 +353,9 @@ void System::arriveAtStop(Event* e) {
 }
 
 void System::deptFromStop(Event* e) {
-    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
+    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
+        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
+        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
     cout << "New Event: Bus " << e->getBusID() << " depart from stop " << e->getStopID() << "\n";
 
     int busID = e->getBusID();
@@ -388,11 +400,14 @@ void System::deptFromStop(Event* e) {
         int totaldwell = paxTime + bus->getDwell();
         cout << "total dwell time = " << totaldwell << "\n";
         
-        Bus* prevBus = nullptr; // Get distance from proceed bus
-        for (auto& b : fleet) {
-            if (b->getId() == busID - 1) {
-                prevBus = b;
-                break;
+        Bus* prevBus = nullptr;
+        for (auto it = fleet.begin(); it != fleet.end(); ++it) {
+            if ((*it)->getId() == busID) {
+                if (it != fleet.begin()) {
+                    prevBus = *(it - 1); 
+                } else {
+                    break;
+                }
             }
         }
     
@@ -403,7 +418,7 @@ void System::deptFromStop(Event* e) {
             cout << "vol = " << bus->getVol() << " dwell time = " << bus->getDwell() << "\n";
 
         } else if (prevBus->getVol()) {
-            float distance = prevBus->getLoaction() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
+            float distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
             if ((distance / Vavg) < bus->getHeadway() * 0.8) {
                 newVol = Vavg;
@@ -428,7 +443,7 @@ void System::deptFromStop(Event* e) {
             bus->setDwell(totaldwell);
 
         } else {
-            float distance = prevBus->getLoaction() - stop->mileage;
+            float distance = prevBus->getLocation() - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
 
             if ((distance / Vavg) < bus->getHeadway() * 0.8) {
@@ -494,7 +509,9 @@ void System::deptFromStop(Event* e) {
 
 void System::arriveAtLight(Event* e) {
     /*Announcement*/
-    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
+    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
+        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
+        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
     cout << "Bus " << e->getBusID() << " arrive at light " << e->getLightID() << "\n";
 
     /*Find target*/
@@ -531,7 +548,7 @@ void System::arriveAtLight(Event* e) {
         cout << "Now is GREEN, just go through...\n";
     } else {
         wait = 15 * randNoise;
-        cout << "Now is RED, wait for " << wait <<"seconds...\n\n";
+        cout << "Now is RED, wait for " << wait <<" seconds...\n\n";
         Event* newEvent = new Event( //dept form light
             e->getTime() + wait, 
             bus->getId(),
@@ -583,7 +600,9 @@ void System::arriveAtLight(Event* e) {
 
 void System::deptFromLight(Event* e) {
     /*Announcement*/
-    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
+    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
+        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
+        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
     cout << "Bus " << e->getBusID() << " dept form light " << e->getLightID() << "\n";
 
     /*Find target*/
