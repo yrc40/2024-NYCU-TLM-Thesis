@@ -50,20 +50,17 @@ optional<variant<Stop*, Light*>> System::findNext(variant<Stop*, Light*> target)
 
 }
 
-void System::incrHeadwayDev(int t) {
+void System::incrHeadwayDev(float t) {
     headwayDev += t;
 }
 
 void System::init() {
     /*TODO: read parameter*/
-    /*fleet、headway*/
-    /*Stop, Light(assume 500/1)*/
-    // cout << "eneter init" << endl;
-    ifstream file( "./data/" + routeName + ".csv");
     string line;
-
+    /*Read Stops*/
+    ifstream file( "./data/" + routeName + ".csv");
+    
     getline(file, line);
-
     while (getline(file, line)) {
         stringstream ss(line);
         string field;
@@ -89,26 +86,37 @@ void System::init() {
         stop->mileage = std::stoi(field);
         stop->pax = 0; 
 
+        //if (stop->id == 1 || stop->id == 2 || stop->id == 3) 
         route.insert(stop);
-
-        //cout << stop->id << " " << stop->direction << " " << stop->stopName << " " << stop->mileage << "\n";
     }
+    file.close();
 
-    file.close(); 
-    Light* light = new Light;
+    /*Read Lights*/
+    
+    ifstream file2( "./data/light307.csv");
+    getline(file2, line);
+    string field;
+    while (getline(file2, line)) {
 
-    light->id = 1;
-    light->mileage = 750;
-    light->state = RED;
-    light->cycleTime = 60;
-    light->offset = 10;
+        stringstream ss(line);
+        Light* light = new Light;
+        string field;
 
-    light->plan.push_back({0, GREEN});
-    light->plan.push_back({20, YELLOW});
-    light->plan.push_back({30, RED});
+        std::getline(ss, field, ',');
+        light->id = stoi(field);
 
-    route.insert(light);
-    /*for (const auto& element : route) {
+        std::getline(ss, field, ',');
+        light->lightName = field;
+
+        std::getline(ss, field, ',');
+        light->mileage = stoi(field);
+
+        //if (light->id == 1 || light->id == 2 || light->id == 3 || light->id == 4) 
+        route.insert(light);
+    }
+    file2.close();
+
+    for (const auto& element : route) {
         visit([](auto&& obj) {
             using T = decay_t<decltype(obj)>;
             if constexpr (is_same_v<T, Stop*>) {
@@ -117,23 +125,123 @@ void System::init() {
                 cout << "Light ID: " << obj->id << endl;
             }
         }, element);
-    }*/
+    }
 
-    Bus* newBus = new Bus(0, 5);
-    fleet.push_back(newBus);
+    /*Read get on rate*/
+    ifstream file3("./data/getOn.csv");
+    getline(file3, line);
+    while (getline(file3, line)) {
+        
+        stringstream ss(line);
+        string field;
+        vector<float> item;
 
-    Bus* new2Bus = new Bus(1, 5);
-    fleet.push_back(new2Bus);
+        std::getline(ss, field, ',');
+        std::getline(ss, field, ',');
+        item.push_back(stof(field) / 3600); //18
+
+        std::getline(ss, field, ',');
+        item.push_back(stof(field) / 3600); // 19
+
+        std::getline(ss, field, ',');
+        item.push_back(stof(field) / 3600); //17
+
+        getOn.push_back(item);
+    }
+    file3.close();
+
+    /*Read get off rate*/
+    ifstream file4("./data/getOff.csv");
+    getline(file4, line);
+    while (getline(file4, line)) {
+        
+        stringstream ss(line);
+        string field;
+        vector<float> item;
+
+        std::getline(ss, field, ',');
+        std::getline(ss, field, ',');
+        item.push_back(stof(field) / 3600); //18
+
+        std::getline(ss, field, ',');
+        item.push_back(stof(field) / 3600); // 19
+
+        std::getline(ss, field, ',');
+        item.push_back(stof(field) / 3600); //17
+
+        getOff.push_back(item);
+    }
+    file4.close();
+
+    /*Read fleet and first departure*/
+    for(int i = 0; i < sche.size(); i++) {
+        if(i == 0) {
+            Bus* newBus = new Bus(0, 300);
+            // newBus->setPax((300 * getOn[0][0]) > newBus->getCapacity() ? newBus->getCapacity() : 300 * getOn[0][0]);
+            fleet.push_back(newBus);
+
+        } else {
+            int hdwy = sche[i] - sche[i-1];
+            Bus* newBus = new Bus(i, hdwy);
+            // newBus->setPax((hdwy * getOn[0][0]) > newBus->getCapacity() ? newBus->getCapacity() : hdwy * getOn[0][0]);
+            fleet.push_back(newBus);
+        }
+        Event* newEvent = new Event( 
+            sche[i], //time
+            i, //bus
+            1, //event
+            1, //stopid
+            1
+        );
+        eventList.push(newEvent);
+    }
 
 }
 
+void System::readSche(int trial) {
+
+    ifstream file5("./data/sche.csv");
+    string line;
+    for(int i=0; i<=trial; i++) {
+        getline(file5, line);
+    }
+    cout << line <<"\n";
+
+    int time, hours, minutes;
+    stringstream ss(line);
+    string field;
+
+    while (std::getline(ss, field, ',')) {
+        string ans = "";
+        for (auto &c : field) {
+            if(c < '0' || c > '9') {
+                continue;
+            } else {
+                ans += c;
+            }
+        }
+
+        try {
+            time = stoi(ans);
+            hours = time / 100; 
+            minutes = time % 100;
+            sche.push_back(hours * 3600 + minutes * 60);
+        } catch (const std::invalid_argument& e) {
+            std::cerr << "\nInvalid argument: " << e.what() << std::endl;
+        } catch (const std::out_of_range& e) {
+            std::cerr << "Out of range: " << e.what() << std::endl;
+        }
+    }
+    file5.close();
+}
+
 void System::arriveAtStop(Event* e) {
-    cout << "Time: " << e->getTime() << "\n";
+    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
     cout << "New Event: Bus " << e->getBusID() << " arrive at stop " << e->getStopID() << "\n";
 
     /*assume drop rate is 0.5*/
-    float dropRate = 0.5;
-    float arriveRate = 0.2;
+    float arriveRate = getOn[(e->getStopID()) - 1][0];
+    float dropRate = getOff[(e->getStopID()) - 1][0];
 
     int busID = e->getBusID();
     Bus* bus = nullptr;
@@ -174,20 +282,25 @@ void System::arriveAtStop(Event* e) {
     bus->setLocation(stop->mileage);
 
     /*Deal with pax*/
-    int paxRemain = static_cast<int>(bus->getPax() * dropRate);
-    int availableCapacity = static_cast<int>(bus->getCapacity() - paxRemain);
-    cout << "availableCapacity: " << availableCapacity << "\n";
+    int paxRemain;
 
     int demand;
     if (stop->lastArrive == -1) {
-        stop->pax += 25; //tmp
-        demand = 25; //tmp
+        paxRemain = (static_cast<int>(bus->getHeadway() * dropRate) > bus->getPax()) ? 0 : (bus->getPax() - bus->getHeadway() * dropRate);
+        stop->pax += 300 * arriveRate;
+        demand = stop->pax;
     } else {
+        paxRemain = (static_cast<int>(bus->getHeadway() * dropRate) > bus->getPax()) ? 0 : (bus->getPax() - bus->getHeadway() * dropRate);
         stop->pax += static_cast<int>((e->getTime() - stop->lastArrive) * arriveRate);
         demand = stop->pax; 
     }
+
+    int availableCapacity = static_cast<int>(bus->getCapacity() - paxRemain);
+    cout << "availableCapacity: " << availableCapacity << "\n";
+
     cout << "Demand: " << demand << "\n";
     int boardPax = (demand > availableCapacity) ? availableCapacity : demand;
+    bus->setDwell(boardPax * 2);
 
     bus->setPax(paxRemain + boardPax);    
     stop->pax -= boardPax;
@@ -201,7 +314,9 @@ void System::arriveAtStop(Event* e) {
         }
     }
     if (prevBus) {
-        this->incrHeadwayDev(pow(((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway(), 2)); //headway deviation
+        cout << " Time: " << e->getTime() << " last arr " << stop->lastArrive << " hdwy " << bus->getHeadway() << "\n";
+        cout << ((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway() << endl;
+        this->incrHeadwayDev(pow(static_cast<float>((e->getTime() - stop->lastArrive) - bus->getHeadway()) / static_cast<float>(bus->getHeadway()), 2)); //headway deviation
         cout << "Cumulative headway deviation" << headwayDev << "\n";
     }
 
@@ -210,7 +325,7 @@ void System::arriveAtStop(Event* e) {
     /*New event*/
     auto itor = route.find(stop);
     if (itor != route.end() && itor == prev(route.end())) {
-        cout << "Final stop in this route, terminate\n";
+        cout << "Final stop in this route, terminate\n\n";
         return;   
     } else {
         cout << "Going to next element ...\n";
@@ -224,13 +339,11 @@ void System::arriveAtStop(Event* e) {
         eventList.push(newEvent); 
     }
     bus->setDwell(bus->getDwell() - min(this->getTmax(), bus->getDwell()));
-    //cout << "!!!!!" << stop->pax << "!!!!\n";
     cout << "\n";
 }
 
 void System::deptFromStop(Event* e) {
-
-    cout << "Time: " << e->getTime() << "\n";
+    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
     cout << "New Event: Bus " << e->getBusID() << " depart from stop " << e->getStopID() << "\n";
 
     int busID = e->getBusID();
@@ -248,7 +361,6 @@ void System::deptFromStop(Event* e) {
     }
     
     int stopID = e->getStopID(); 
-    //cout << "busID: " << e->getBusID() << endl;
     Stop* stop = nullptr;
     auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
         if (auto* s = get_if<Stop*>(&item)) {
@@ -267,12 +379,12 @@ void System::deptFromStop(Event* e) {
     auto nextStop = this->getNextStop(stopID);
 
     /*Calculate scheme*/
-    float arriveRate = 0.2; //tmp assumption
-    float dropRate = 0.5; //tmp assumption
     if (nextStop.has_value()) {
+        float arriveRate = getOn[(nextStop.value()->id) - 1][0];
+        float dropRate = getOff[(nextStop.value()->id) - 1][0];
         cout << "Next stop is: " << nextStop.value()->id << " " << nextStop.value()->stopName << "\n";
         int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
-        int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7)); //2.7 * tan(bus->getPax() * (1 - dropRate) / bus->getCapacity())
+        int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
         int totaldwell = paxTime + bus->getDwell();
         cout << "total dwell time = " << totaldwell << "\n";
         
@@ -293,6 +405,12 @@ void System::deptFromStop(Event* e) {
         } else if (prevBus->getVol()) {
             float distance = prevBus->getLoaction() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
+            if ((distance / Vavg) < bus->getHeadway() * 0.8) {
+                newVol = Vavg;
+                cout << "No bunching, just run with avg speed.\n";
+            } else {
+                cout << "There's might be bus bunching, use the given scheme\n";
+            }
             cout << "distance = " << distance << " new Vol = " << newVol << "\n";
 
 
@@ -312,6 +430,14 @@ void System::deptFromStop(Event* e) {
         } else {
             float distance = prevBus->getLoaction() - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
+
+            if ((distance / Vavg) < bus->getHeadway() * 0.8) {
+                newVol = Vavg;
+                cout << "No bunching, just run with avg speed.\n";
+            } else {
+                cout << "There's might be bus bunching, use the given scheme\n";
+            }
+            cout << "distance = " << distance << " new Vol = " << newVol << "\n";
 
             if(newVol < Vlow) {
                 totaldwell += (distance / newVol) - (distance / Vavg);
@@ -368,7 +494,7 @@ void System::deptFromStop(Event* e) {
 
 void System::arriveAtLight(Event* e) {
     /*Announcement*/
-    cout << "Time: " << e->getTime() << "\n";
+    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
     cout << "Bus " << e->getBusID() << " arrive at light " << e->getLightID() << "\n";
 
     /*Find target*/
@@ -389,71 +515,23 @@ void System::arriveAtLight(Event* e) {
     int lightID = e->getLightID();
     Light* light = nullptr;
     auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-        if (auto* l = get_if<Light*>(&item)) {
+        if (auto* s = get_if<Light*>(&item)) {
+            if ((*s)->id == lightID) {
+                light = *s;
                 return true;
+            }
         }
         return false;
     });
 
-    if (it != route.end()) {
-        light = get<Light*>(*it);
-    } else {
-        cout << "Error: Stop not found for ID " << lightID << endl;
-        return;
-    }
-
-    /*Update bus status*/
-    bus->setLocation(light->mileage);
-
-    /*Update light status*/
-    int remainder = (e->getTime() - light->offset) % light->cycleTime;
-    int wait = 0;
-    for (auto it = light->plan.begin(); it != light->plan.end() - 1; it++) {
-        if (remainder >= it->first && remainder < (it + 1)->first) {
-            light->state =  it->second;
-            wait = (it + 1)->first - remainder;
-        }
-    }
-
     /*New Event*/
-    if (light->state == GREEN) {
+    int randNoise = rand() % 4;
+    int wait = 0;
+    if (randNoise == 0) {
         cout << "Now is GREEN, just go through...\n";
-        auto nextElement = findNext(light);
-        if(nextElement.has_value()) {
-            visit([&](auto* obj) {
-                using T = decay_t<decltype(*obj)>;
-                if constexpr (is_same_v<T, Stop>) {
-                    int dist =  obj->mileage - light->mileage;
-                    int newTime = e->getTime() + dist / bus->getVol();
-                    Event* newEvent = new Event( //arrive at stop
-                        newTime, 
-                        bus->getId(),
-                        1, 
-                        obj->id, 
-                        e->getDirection()
-                    );
-                    eventList.push(newEvent);
-
-                } else if constexpr (is_same_v<T, Light>) {
-                    cout << "Next Light ID: " << obj->id << endl;
-                    int dist = obj->mileage - light->mileage;
-                    int newTime = e->getTime() + dist / bus->getVol();
-                    Event* newEvent = new Event( //arrive at light
-                        newTime, 
-                        bus->getId(),
-                        3, 
-                        obj->id, 
-                        e->getDirection()
-                    );
-                    eventList.push(newEvent);
-                }
-            }, nextElement.value());
-        } else {
-            cout << "Can't find next element or no next\n";
-        }
     } else {
-        cout << "Now is RED, wait for " << wait << " second...\n";
-        // bus->setLastStop(e->getTime());
+        wait = 15 * randNoise;
+        cout << "Now is RED, wait for " << wait <<"seconds...\n\n";
         Event* newEvent = new Event( //dept form light
             e->getTime() + wait, 
             bus->getId(),
@@ -462,13 +540,50 @@ void System::arriveAtLight(Event* e) {
             e->getDirection()
         );
         eventList.push(newEvent);
+        return;
     }
+
+    auto nextElement = findNext(light);
+    if(nextElement.has_value()) {
+        visit([&](auto* obj) {
+            using T = decay_t<decltype(*obj)>;
+            if constexpr (is_same_v<T, Stop>) {
+                cout << "Next Stop ID: " << obj->id << endl;
+                int dist =  obj->mileage - light->mileage;
+                int newTime = e->getTime() + dist / bus->getVol();
+                Event* newEvent = new Event( //arrive at stop
+                    newTime, 
+                    bus->getId(),
+                    1, 
+                    obj->id, 
+                    e->getDirection()
+                );
+                eventList.push(newEvent);
+
+            } else if constexpr (is_same_v<T, Light>) {
+                cout << "Next Light ID: " << obj->id << endl;
+                int dist = obj->mileage - light->mileage;
+                int newTime = e->getTime() + dist / bus->getVol();
+                Event* newEvent = new Event( //arrive at light
+                    newTime, 
+                    bus->getId(),
+                    3, 
+                    obj->id, 
+                    e->getDirection()
+                );
+                eventList.push(newEvent);
+            }
+        }, nextElement.value());
+    } else {
+        cout << "Can't find next element or no next\n";
+    }
+    
     cout << "\n";
 }
 
 void System::deptFromLight(Event* e) {
     /*Announcement*/
-    cout << "Time: " << e->getTime() << "\n";
+    cout << "Time: " << e->getTime() / 3600 << ":" << (e->getTime() % 3600) / 60  << ":" << e->getTime() % 60<< "\n";
     cout << "Bus " << e->getBusID() << " dept form light " << e->getLightID() << "\n";
 
     /*Find target*/
@@ -489,18 +604,14 @@ void System::deptFromLight(Event* e) {
     int lightID = e->getLightID();
     Light* light = nullptr;
     auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-        if (auto* l = get_if<Light*>(&item)) {
+        if (auto* s = get_if<Light*>(&item)) {
+            if ((*s)->id == lightID) {
+                light = *s;
                 return true;
+            }
         }
         return false;
     });
-
-    if (it != route.end()) {
-        light = get<Light*>(*it);
-    } else {
-        cout << "Error: Stop not found for ID " << lightID << endl;
-        return;
-    }
 
     /*Updat bus status*/
     bus->setLastGo(e->getTime());
@@ -544,27 +655,11 @@ void System::deptFromLight(Event* e) {
 
 
 void System::simulation() {
-    Event* newEvent = new Event( 
-        0, //time
-        0, //bus
-        2, //event
-        2, //stopid
-        0
-    );
-    eventList.push(newEvent);
 
-    Event* new2Event = new Event( 
-        5*60, //time
-        1, //bus
-        2, //event
-        2, //stopid
-        0
-    );
-    eventList.push(new2Event);
+    cout << fleet.size() << "\n";
 
     while(!eventList.empty()) {
         Event* currentEvent = eventList.top();
-        // cout << eventList.size() << "\n";
         int eventType = currentEvent->getEventType();
         auto it = eventSet.find(eventType);
         if (it != eventSet.end()) {
@@ -573,13 +668,13 @@ void System::simulation() {
             cout << "Unknown event type: " << eventType << endl;
         }
         eventList.pop();
-        // cout << eventList.size() << "\n";
     }
 }
 
 void System::performance() {
     cout << ">>> Performance <<<\n";
     cout << "There were " << fleet.size() << "bus run today.\n";
-    cout << "Each line consists of 127 stop.\n"; 
+    cout << "Each line consists of 31 stop.\n"; 
     cout << "Total heawdway deviation: " << this->headwayDev / 1;
+    cout << "\nAvg headway deviation: " << this->headwayDev /(fleet.size() * 31);
 }

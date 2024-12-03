@@ -11,7 +11,8 @@ enum TrafficLight { RED, YELLOW, GREEN };
 
 struct Light {
     int id;
-    int mileage;
+    int mileage = 0;
+    string lightName;
     TrafficLight state = GREEN;
     int cycleTime;
     vector<pair<int, TrafficLight>> plan;
@@ -47,6 +48,7 @@ class System {
         void init(); //also setup event
         void simulation(); //also trigger event
         void performance();
+        void readSche(int trial);
 
         void arriveAtStop(Event* e);
         void deptFromStop(Event* e);
@@ -55,7 +57,7 @@ class System {
         void paxArriveAtStop(Event* e);
 
         /*Func*/
-        void incrHeadwayDev(int dev);
+        void incrHeadwayDev(float dev);
         optional<Stop*> getNextStop(int stopID);
 
         /*getter*/
@@ -65,22 +67,28 @@ class System {
         /*Paramemter*/
         string routeName;
         int Tmax = 3 * 60;
-        float Vavg = 40 / 3.6;
-        float Vlimit = 50 / 3.6;
+        float Vavg = 25 / 3.6;
+        float Vlimit = 40 / 3.6;
         float Vlow = 15 / 3.6;
 
         /*Variable*/
-        int headwayDev = 0;
+        float headwayDev = 0;
 
         /*Data Structure*/
         vector<Bus*> fleet;
         priority_queue<Event*, vector<Event*>, eventCmp> eventList;
         set<variant<Stop*, Light*>, mileageCmp> route;
         map<int, function<void(Event*)>> eventSet;
+        vector<vector<float>> getOn;
+        vector<vector<float>> getOff;
+        vector<int> sche;
+        vector<Light*> lights;
+        vector<Stop*> stops;
 
         /*Function*/
         optional<Stop*> findNextStop(int stopID);
         optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target);
+
         
 };
 
