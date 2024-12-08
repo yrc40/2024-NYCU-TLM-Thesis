@@ -1,4 +1,6 @@
 #include "System.hpp"
+#include <iomanip>
+#include <sstream>
 
 System::System() : route(mileageCmp()) {}
 
@@ -52,6 +54,13 @@ optional<variant<Stop*, Light*>> System::findNext(variant<Stop*, Light*> target)
 
 void System::incrHeadwayDev(float t) {
     headwayDev += t;
+}
+
+string showTime(int time) {
+    ostringstream oss;
+    oss << setw(2) << setfill('0') << time / 3600 << ":"
+        << setw(2) << setfill('0') << (time % 3600) / 60;
+    return oss.str();
 }
 
 void System::init() {
@@ -116,7 +125,7 @@ void System::init() {
     }
     file2.close();
 
-    for (const auto& element : route) {
+    /*for (const auto& element : route) {
         visit([](auto&& obj) {
             using T = decay_t<decltype(obj)>;
             if constexpr (is_same_v<T, Stop*>) {
@@ -125,7 +134,7 @@ void System::init() {
                 cout << "Light ID: " << obj->id << endl;
             }
         }, element);
-    }
+    }*/
 
     /*Read get on rate*/
     ifstream file3("./data/getOn.csv");
@@ -205,7 +214,6 @@ void System::readSche(int trial) {
     for(int i=0; i<=trial; i++) {
         getline(file5, line);
     }
-    cout << line <<"\n";
 
     int time, hours, minutes;
     stringstream ss(line);
@@ -223,9 +231,7 @@ void System::readSche(int trial) {
 
         try {
             time = stoi(ans);
-            hours = time / 100; 
-            minutes = time % 100;
-            sche.push_back(hours * 3600 + minutes * 60);
+            sche.push_back(time);
         } catch (const std::invalid_argument& e) {
             std::cerr << "\nInvalid argument: " << e.what() << std::endl;
         } catch (const std::out_of_range& e) {
@@ -253,7 +259,6 @@ void System::arriveAtStop(Event* e) {
             break;
         }
     }
-    // cout << "dwell time = " << bus->getDwell() << "\n";
     
     if (!bus) {
         cout << "Error: Bus not found for ID " << busID << endl;
@@ -285,6 +290,8 @@ void System::arriveAtStop(Event* e) {
     sort(fleet.begin(), fleet.end(), [](Bus* a, Bus* b) {
         return a->getLocation() > b->getLocation(); 
     });
+
+    cout << "mileage = " << bus->getLocation() << "\n"; 
 
     /*Deal with pax*/
     int paxRemain;
@@ -324,10 +331,12 @@ void System::arriveAtStop(Event* e) {
 
     // Get distance from proceed bus
     if (prevBus) {
-        cout << " Time: " << e->getTime() << " last arr " << stop->lastArrive << " hdwy " << bus->getHeadway() << "\n";
-        cout << ((e->getTime() - stop->lastArrive) - bus->getHeadway()) / bus->getHeadway() << endl;
+        cout << "Time: " << e->getTime() << ", last arrive time: " << stop->lastArrive <<
+            ", scheduled headeay: " << bus->getHeadway() / 60 << " min\n";
+        
+        cout << "headway deviation: " << abs(static_cast<float>((e->getTime() - stop->lastArrive) - bus->getHeadway())) << " seconds\n";
         this->incrHeadwayDev(pow(static_cast<float>((e->getTime() - stop->lastArrive) - bus->getHeadway()) / static_cast<float>(bus->getHeadway()), 2)); //headway deviation
-        cout << "Cumulative headway deviation" << headwayDev << "\n";
+        cout << "Cumulative headway deviation: " << headwayDev << "\n";
     }
 
     stop->lastArrive = e->getTime();
@@ -415,20 +424,21 @@ void System::deptFromStop(Event* e) {
             cout << "The first bus should not follow other's volocity" << "\n";
             bus->setVol(Vavg);
             bus->setDwell(totaldwell);
-            cout << "vol = " << bus->getVol() << " dwell time = " << bus->getDwell() << "\n";
+            cout << "vol = " << bus->getVol() * 3.6 << " kph, dwell time = " << bus->getDwell() << "\n";
 
         } else if (prevBus->getVol()) {
             float distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
             if ((distance / Vavg) < bus->getHeadway() * 0.8) {
                 newVol = Vavg;
+                if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
+                bus->bunching = make_pair(stop->id, 0);
                 cout << "No bunching, just run with avg speed.\n";
             } else {
+                bus->bunching = make_pair(stop->id, 1);
                 cout << "There's might be bus bunching, use the given scheme\n";
             }
-            cout << "distance = " << distance << " new Vol = " << newVol << "\n";
-
-
+            
             if(newVol < Vlow) {
                 totaldwell += (distance / newVol) - (distance / Vavg);
                 newVol = Vavg;
@@ -441,6 +451,7 @@ void System::deptFromStop(Event* e) {
 
             bus->setVol(newVol);
             bus->setDwell(totaldwell);
+            cout << "distance = " << distance << " new Vol = " << newVol * 3.6 << " kph\n";
 
         } else {
             float distance = prevBus->getLocation() - stop->mileage;
@@ -448,11 +459,13 @@ void System::deptFromStop(Event* e) {
 
             if ((distance / Vavg) < bus->getHeadway() * 0.8) {
                 newVol = Vavg;
+                if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
+                bus->bunching = make_pair(stop->id, 0);
                 cout << "No bunching, just run with avg speed.\n";
             } else {
+                bus->bunching = make_pair(stop->id, 1);
                 cout << "There's might be bus bunching, use the given scheme\n";
             }
-            cout << "distance = " << distance << " new Vol = " << newVol << "\n";
 
             if(newVol < Vlow) {
                 totaldwell += (distance / newVol) - (distance / Vavg);
@@ -466,6 +479,7 @@ void System::deptFromStop(Event* e) {
 
             bus->setVol(newVol);
             bus->setDwell(totaldwell);
+            cout << "distance = " << distance << " new Vol = " << newVol * 3.6 << " kph\n";
         }
     }
 
@@ -692,8 +706,8 @@ void System::simulation() {
 
 void System::performance() {
     cout << ">>> Performance <<<\n";
-    cout << "There were " << fleet.size() << "bus run today.\n";
+    cout << "There were " << fleet.size() << " bus run today.\n";
     cout << "Each line consists of 31 stop.\n"; 
     cout << "Total heawdway deviation: " << this->headwayDev / 1;
-    cout << "\nAvg headway deviation: " << this->headwayDev /(fleet.size() * 31);
+    cout << "\nAvg headway deviation: " << this->headwayDev /(fleet.size() - 1);
 }

@@ -6,6 +6,7 @@ using namespace std;
 int main() {
     srand(time(0));
     System system("307g");
+    cout << ">>> Simulation for 307 莒光往板橋前站 <<<\n";
     /*for(int i = 0; i < 3; i++) {
         
     }*/

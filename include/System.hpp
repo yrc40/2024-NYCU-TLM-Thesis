@@ -88,6 +88,7 @@ class System {
         /*Function*/
         optional<Stop*> findNextStop(int stopID);
         optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target);
+        string showTime(int time);
 
         
 };

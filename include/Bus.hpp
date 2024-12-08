@@ -2,6 +2,7 @@
 #define BUS_HPP
 
 #include "Event.hpp"
+#include <utility>
 
 using namespace std;
 
@@ -22,6 +23,8 @@ class Bus {
         void setLocation(int l);
         void setDwell(int d);
         void setLastGo(int t);
+
+        pair<int, bool> bunching = {0, 0};
 
     private:
         int id;
