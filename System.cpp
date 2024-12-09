@@ -366,6 +366,7 @@ void System::deptFromStop(Event* e) {
         std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
         std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
     cout << "New Event: Bus " << e->getBusID() << " depart from stop " << e->getStopID() << "\n";
+    
 
     int busID = e->getBusID();
     Bus* bus = nullptr;
@@ -395,6 +396,7 @@ void System::deptFromStop(Event* e) {
 
     /*Update bus status*/
     bus->setLastGo(e->getTime());
+    cout << "mileage = " << bus->getLocation() << "\n";
 
     //find next stop
     auto nextStop = this->getNextStop(stopID);
@@ -429,7 +431,7 @@ void System::deptFromStop(Event* e) {
         } else if (prevBus->getVol()) {
             float distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
-            if ((distance / Vavg) < bus->getHeadway() * 0.8) {
+            if ((distance / Vavg) < bus->getHeadway() * 0.75) { //
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -457,7 +459,7 @@ void System::deptFromStop(Event* e) {
             float distance = prevBus->getLocation() - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
 
-            if ((distance / Vavg) < bus->getHeadway() * 0.8) {
+            if ((distance / Vavg) < bus->getHeadway() * 0.75) { //
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -554,14 +556,17 @@ void System::arriveAtLight(Event* e) {
         }
         return false;
     });
+    bus->setLocation(light->mileage);
+    cout << "mileage = " << bus->getLocation() << "\n";
 
     /*New Event*/
-    int randNoise = rand() % 4;
+    int randNoise = rand() % 2;
     int wait = 0;
     if (randNoise == 0) {
         cout << "Now is GREEN, just go through...\n";
     } else {
-        wait = 15 * randNoise;
+        int redTime = rand() % 2;
+        wait = 10 * (redTime + 1);
         cout << "Now is RED, wait for " << wait <<" seconds...\n\n";
         Event* newEvent = new Event( //dept form light
             e->getTime() + wait, 
@@ -647,6 +652,8 @@ void System::deptFromLight(Event* e) {
     });
 
     /*Updat bus status*/
+    bus->setLocation(light->mileage);
+    cout << "mileage = " << bus->getLocation() << "\n";
     bus->setLastGo(e->getTime());
 
     /*New event*/

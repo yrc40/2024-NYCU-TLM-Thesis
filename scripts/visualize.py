@@ -37,15 +37,14 @@ for bus_id, data in bus_data.items():
     valid_data = [(t, m) for t, m in zip(data["time"], data["mileage"]) if m is not None]
     if valid_data:
         times, mileages = zip(*valid_data)
-        plt.plot(times, mileages, marker="o", label=f"Bus {bus_id}")
+        plt.plot(times, mileages, marker="o", markersize=0, label=f"Bus {bus_id}")
 
-plt.title("Bus Time-Space Line Chart")
+plt.title("Scheme 1 Time-Space Diagram (Headway Deviation = 11.83)")
 plt.xlabel("Time (seconds)")
-plt.ylabel("Mileage")
+plt.ylabel("Mileage (meters)")
 plt.legend()
 plt.grid(True)
 
 output_path = "bus_time_mileage_chart.png"
 plt.savefig(output_path)
 print(f"saved plot to {output_path}")
-
