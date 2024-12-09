@@ -66,7 +66,7 @@ class System {
     private:
         /*Paramemter*/
         string routeName;
-        int Tmax = 3 * 60;
+        int Tmax = 60;
         float Vavg = 25 / 3.6;
         float Vlimit = 40 / 3.6;
         float Vlow = 15 / 3.6;

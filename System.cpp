@@ -404,10 +404,6 @@ void System::deptFromStop(Event* e) {
         float arriveRate = getOn[(nextStop.value()->id) - 1][0];
         float dropRate = getOff[(nextStop.value()->id) - 1][0];
         cout << "Next stop is: " << nextStop.value()->id << " " << nextStop.value()->stopName << "\n";
-        int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
-        int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
-        int totaldwell = paxTime + bus->getDwell();
-        cout << "total dwell time = " << totaldwell << "\n";
         
         Bus* prevBus = nullptr;
         for (auto it = fleet.begin(); it != fleet.end(); ++it) {
@@ -419,17 +415,27 @@ void System::deptFromStop(Event* e) {
                 }
             }
         }
-    
+
+        int newVol;
         if (!prevBus) { //first car 
             cout << "The first bus should not follow other's volocity" << "\n";
+            int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
+            int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
+            int totaldwell = paxTime + bus->getDwell();
             bus->setVol(Vavg);
             bus->setDwell(totaldwell);
             cout << "vol = " << bus->getVol() * 3.6 << " kph, dwell time = " << bus->getDwell() << "\n";
 
         } else if (prevBus->getVol()) {
             float distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
-            float newVol = distance / (bus->getHeadway() + totaldwell);
-            if ((distance / Vavg) < bus->getHeadway() * 0.8) {
+            int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
+            int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
+            int totaldwell = paxTime + bus->getDwell();
+            float newDwell = bus->getDwell() + (bus->getHeadway() - distance / Vavg - totaldwell);
+            cout << "total dwell time = " << totaldwell << "\n";
+
+            // float newVol = Vavg;
+            if ((distance / Vavg) < bus->getHeadway() * 0.7) {
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -439,25 +445,42 @@ void System::deptFromStop(Event* e) {
                 cout << "There's might be bus bunching, use the given scheme\n";
             }
             
-            if(newVol < Vlow) {
-                totaldwell += (distance / newVol) - (distance / Vavg);
-                newVol = Vavg;
-                bus->setVol(newVol);
-                bus->setDwell(totaldwell);
-            } else if (newVol > Vlimit) {
-                prevBus->setDwell(prevBus->getDwell() + (distance / Vlimit) - (distance / newVol));
-                newVol = Vlimit;
+            if(newDwell < 0) {
+                bus->setDwell(paxTime);
+                newVol = distance / (bus->getHeadway() + paxTime + newDwell);
+                if(newVol > Vlimit) {
+                    newVol = Vlimit;
+                    newDwell = prevBus->getDwell() + (distance / Vlimit) - (distance / newVol);
+                } else if (newVol < Vlow) {
+                    newVol = Vlow;
+                    newDwell = paxTime + (distance / newVol) - (distance / Vlow);
+                }
+            } else if (newDwell > Tmax) {
+                bus->setDwell(Tmax);
+                newVol = distance / (bus->getHeadway() - Tmax - totaldwell);
+                if(newVol < Vlow) {
+                    newVol = Vlow;
+                    newDwell = Tmax + (distance / newVol) - (distance / Vlow);
+                }
             }
-
+            bus->setDwell(newDwell);
             bus->setVol(newVol);
-            bus->setDwell(totaldwell);
-            cout << "distance = " << distance << " new Vol = " << newVol * 3.6 << " kph\n";
+            if (distance == 0) {
+                newVol = Vavg;
+                newDwell = totaldwell;
+            }
+            cout << "distance = " << distance << " new Vol1 = " << newVol * 3.6 << " kph\n";
 
         } else {
             float distance = prevBus->getLocation() - stop->mileage;
-            float newVol = distance / (bus->getHeadway() + totaldwell);
+            int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
+            int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
+            int totaldwell = paxTime + bus->getDwell();
+            float newDwell = bus->getDwell() + (bus->getHeadway() - distance / Vavg - totaldwell);
+            cout << "total dwell time = " << totaldwell << "\n";
 
-            if ((distance / Vavg) < bus->getHeadway() * 0.8) {
+            // float newVol = Vavg;
+            if ((distance / Vavg) < bus->getHeadway() * 0.7) {
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -466,20 +489,35 @@ void System::deptFromStop(Event* e) {
                 bus->bunching = make_pair(stop->id, 1);
                 cout << "There's might be bus bunching, use the given scheme\n";
             }
-
-            if(newVol < Vlow) {
-                totaldwell += (distance / newVol) - (distance / Vavg);
-                newVol = Vavg;
-                bus->setVol(newVol);
-                bus->setDwell(totaldwell);
-            } else if (newVol > Vlimit) {
-                prevBus->setDwell(prevBus->getDwell() + (distance / Vlimit) - (distance / newVol));
-                newVol = Vlimit;
+            
+            if(newDwell < 0) {
+                bus->setDwell(paxTime);
+                newVol = distance / (bus->getHeadway() + paxTime + newDwell);
+                if(newVol > Vlimit) {
+                    newVol = Vlimit;
+                    newDwell = prevBus->getDwell() + (distance / Vlimit) - (distance / newVol);
+                } else if(newVol < Vlow) {
+                    newVol = Vlow;
+                    newDwell = Tmax + (distance / newVol) - (distance / Vlow);
+                }
+            } else if (newDwell > Tmax) {
+                bus->setDwell(Tmax);
+                newVol = distance / (bus->getHeadway() - Tmax - totaldwell);
+                if(newVol < Vlow) {
+                    newVol = Vlow;
+                    newDwell = Tmax + (distance / newVol) - (distance / Vlow);
+                } else if(newVol > Vlimit) {
+                    newVol = Vlimit;
+                    newDwell = prevBus->getDwell() + (distance / Vlimit) - (distance / newVol);
+                }
             }
-
+            bus->setDwell(newDwell);
             bus->setVol(newVol);
-            bus->setDwell(totaldwell);
-            cout << "distance = " << distance << " new Vol = " << newVol * 3.6 << " kph\n";
+            if (distance == 0) {
+                newVol = Vavg;
+                newDwell = totaldwell;
+            }
+            cout << "distance = " << distance << " new Vol2 = " << newVol * 3.6 << " kph\n";
         }
     }
 
@@ -556,12 +594,12 @@ void System::arriveAtLight(Event* e) {
     });
 
     /*New Event*/
-    int randNoise = rand() % 4;
+    int randNoise = rand() % 3;
     int wait = 0;
     if (randNoise == 0) {
         cout << "Now is GREEN, just go through...\n";
     } else {
-        wait = 15 * randNoise;
+        wait = 10 * randNoise;
         cout << "Now is RED, wait for " << wait <<" seconds...\n\n";
         Event* newEvent = new Event( //dept form light
             e->getTime() + wait, 
