@@ -395,6 +395,7 @@ void System::deptFromStop(Event* e) {
 
     /*Update bus status*/
     bus->setLastGo(e->getTime());
+    cout << "mileage = " << bus->getLocation() << "\n";
 
     //find next stop
     auto nextStop = this->getNextStop(stopID);
@@ -592,14 +593,17 @@ void System::arriveAtLight(Event* e) {
         }
         return false;
     });
+    bus->setLocation(light->mileage);
+    cout << "mileage = " << bus->getLocation() << "\n";
 
     /*New Event*/
-    int randNoise = rand() % 3;
+    int randNoise = rand() % 2;
     int wait = 0;
     if (randNoise == 0) {
         cout << "Now is GREEN, just go through...\n";
     } else {
-        wait = 10 * randNoise;
+        int redTime = rand() % 2;
+        wait = 10 * (redTime + 1);
         cout << "Now is RED, wait for " << wait <<" seconds...\n\n";
         Event* newEvent = new Event( //dept form light
             e->getTime() + wait, 
@@ -686,6 +690,8 @@ void System::deptFromLight(Event* e) {
 
     /*Updat bus status*/
     bus->setLastGo(e->getTime());
+    bus->setLocation(light->mileage);
+    cout << "mileage = " << bus->getLocation() << "\n";
 
     /*New event*/
     auto nextElement = findNext(light);
