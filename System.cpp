@@ -433,10 +433,11 @@ void System::deptFromStop(Event* e) {
             int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
             int totaldwell = paxTime + bus->getDwell();
             float newDwell = bus->getDwell() + (bus->getHeadway() - distance / Vavg - totaldwell);
+            newVol = Vavg;
             cout << "total dwell time = " << totaldwell << "\n";
 
             // float newVol = Vavg;
-            if ((distance / Vavg) < bus->getHeadway() * 0.7) {
+            if ((distance / Vavg) < bus->getHeadway() * 0.75 || (distance / Vavg) > bus->getHeadway() * 1.25) {
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -447,21 +448,29 @@ void System::deptFromStop(Event* e) {
             }
             
             if(newDwell < 0) {
+                cout << "yes new dwell < 0\n";
+                cout << "dist: " << distance << " hddwy " << bus->getHeadway() << " paxtime " << paxTime << "new dwel " << newDwell << "\n";
                 bus->setDwell(paxTime);
                 newVol = distance / (bus->getHeadway() + paxTime + newDwell);
                 if(newVol > Vlimit) {
                     newVol = Vlimit;
                     newDwell = prevBus->getDwell() + (distance / Vlimit) - (distance / newVol);
-                } else if (newVol < Vlow) {
+                } else if(newVol < Vlow) {
                     newVol = Vlow;
-                    newDwell = paxTime + (distance / newVol) - (distance / Vlow);
+                    newDwell = Tmax + (distance / newVol) - (distance / Vlow);
                 }
             } else if (newDwell > Tmax) {
+                cout << "yes new dwell > Tmax\n";
+                cout << "dist: " << distance << " hddwy " << bus->getHeadway() << " paxtime " << paxTime << "new dwel " << newDwell << "\n";
+                cout << "Total dwell " << totaldwell;
                 bus->setDwell(Tmax);
                 newVol = distance / (bus->getHeadway() - Tmax - totaldwell);
                 if(newVol < Vlow) {
                     newVol = Vlow;
                     newDwell = Tmax + (distance / newVol) - (distance / Vlow);
+                } else if(newVol > Vlimit) {
+                    newVol = Vlimit;
+                    newDwell = prevBus->getDwell() + (distance / Vlimit) - (distance / newVol);
                 }
             }
             bus->setDwell(newDwell);
@@ -479,9 +488,10 @@ void System::deptFromStop(Event* e) {
             int totaldwell = paxTime + bus->getDwell();
             float newDwell = bus->getDwell() + (bus->getHeadway() - distance / Vavg - totaldwell);
             cout << "total dwell time = " << totaldwell << "\n";
+            newVol = Vavg;
 
             // float newVol = Vavg;
-            if ((distance / Vavg) < bus->getHeadway() * 0.7) {
+            if ((distance / Vavg) < bus->getHeadway() * 0.75 || (distance / Vavg) > bus->getHeadway() * 1.25) {
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);

@@ -5,7 +5,7 @@ output_file="result.txt"
 
 > "$output_file"
 
-for i in $(seq 1 100); do
+for i in $(seq 1 1000); do
     echo "Run #$i" >> "$output_file"
     "$executable" >> "$output_file"
     echo "" >> "$output_file"
