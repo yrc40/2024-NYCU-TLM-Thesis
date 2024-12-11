@@ -431,7 +431,7 @@ void System::deptFromStop(Event* e) {
         } else if (prevBus->getVol()) {
             float distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
-            if ((distance / Vavg) < bus->getHeadway() * 0.75) { //
+            if ((distance / Vavg) < bus->getHeadway() * 0.75) { // || (distance / Vavg) > bus->getHeadway() * 1.5
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -442,11 +442,20 @@ void System::deptFromStop(Event* e) {
             }
             
             if(newVol < Vlow) {
+                cout << "Yes it's too close\n";
+                cout << "distance: " << distance << "\n";
+                cout << "paxTime: " << paxTime << "\n";
+                cout << "totalDwell: " << totaldwell << "\n";
                 totaldwell += (distance / newVol) - (distance / Vavg);
                 newVol = Vavg;
                 bus->setVol(newVol);
                 bus->setDwell(totaldwell);
             } else if (newVol > Vlimit) {
+                cout << "Yes it's too far\n";
+                cout << "distance: " << distance << "\n";
+                cout << "paxTime: " << paxTime << "\n";
+                cout << "totalDwell: " << totaldwell << "\n";
+                cout << "hdwy: " << bus->getHeadway() << "\n";
                 prevBus->setDwell(prevBus->getDwell() + (distance / Vlimit) - (distance / newVol));
                 newVol = Vlimit;
             }
@@ -459,22 +468,34 @@ void System::deptFromStop(Event* e) {
             float distance = prevBus->getLocation() - stop->mileage;
             float newVol = distance / (bus->getHeadway() + totaldwell);
 
-            if ((distance / Vavg) < bus->getHeadway() * 0.75) { //
+            if ((distance / Vavg) < bus->getHeadway() * 0.75 ) { //|| (distance / Vavg) > bus->getHeadway() * 1.5)
+                //cout << "Yes it's too far\n";
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
                 cout << "No bunching, just run with avg speed.\n";
             } else {
+                 //cout << "Yes it's too close\n";
                 bus->bunching = make_pair(stop->id, 1);
                 cout << "There's might be bus bunching, use the given scheme\n";
             }
 
             if(newVol < Vlow) {
+                cout << "Yes it's too close\n";
+                cout << newVol << "\n";
+                cout << "distance: " << distance << "\n";
+                cout << "paxTime: " << paxTime << "\n";
+                cout << "totalDwell: " << totaldwell << "\n";
                 totaldwell += (distance / newVol) - (distance / Vavg);
                 newVol = Vavg;
                 bus->setVol(newVol);
                 bus->setDwell(totaldwell);
             } else if (newVol > Vlimit) {
+                cout << "Yes it's too far\n";
+                cout << "distance: " << distance << "\n";
+                cout << "paxTime: " << paxTime << "\n";
+                cout << "totalDwell: " << totaldwell << "\n";
+                cout << "hdwy: " << bus->getHeadway() << "\n";
                 prevBus->setDwell(prevBus->getDwell() + (distance / Vlimit) - (distance / newVol));
                 newVol = Vlimit;
             }
