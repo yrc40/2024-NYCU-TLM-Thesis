@@ -39,7 +39,7 @@ for bus_id, data in bus_data.items():
         times, mileages = zip(*valid_data)
         plt.plot(times, mileages, marker="o", markersize=0, label=f"Bus {bus_id}")
 
-plt.title("Scheme 2 Time-Space Line Diagram (Overall Average Headway Deviation = 7.14)")
+plt.title("Scheme 2 Time-Space Diagram")
 plt.xlabel("Time (seconds)")
 plt.ylabel("Mileage")
 plt.legend()
