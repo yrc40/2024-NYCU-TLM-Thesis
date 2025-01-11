@@ -8,33 +8,37 @@ using namespace std;
 
 class Bus {
     public:
-        Bus(int id, int headway);
-        int getId();
-        float getVol();
-        int getPax();
-        int getLocation();
-        int getDwell();
-        int getLastGo();
-        const int getCapacity();
-        const int getHeadway();
+        /* Constructor */
+        Bus(int id, int headway); // 給定 id 及 headway
 
-        void setVol(float v);
-        void setPax(int p);
-        void setLocation(int l);
-        void setDwell(int d);
-        void setLastGo(int t);
+        /* Getter */
+        int getId(); // 取得公車 id
+        float getVol(); // 取得公車當前速度
+        int getPax(); // 取得公車當前乘客數
+        int getLocation(); // 取得公車當前位置 (里程)
+        int getDwell(); // 取得公車之設計置站時間
+        int getLastGo(); // 取得公車上一次駛離站點或號誌的時間
+        const int getCapacity(); // 取得公車容量
+        const int getHeadway(); // 取得公車與上一班車的發車間距
 
-        pair<int, bool> bunching = {0, 0};
+        /* Setter */
+        void setVol(float v); // 設定速度
+        void setPax(int p); // 設定乘客數
+        void setLocation(int l); // 設定位置 (里程)
+        void setDwell(int d); // 設定置站時間
+        void setLastGo(int t); // 設定上一次駛離站點或號誌的時間
+
+        pair<int, bool> bunching = {0, 0}; // 連班記錄變數 { 第幾站, 連班與否 }
 
     private:
-        int id;
-        const int capacity = 60;
-        float vol = 0;
-        int pax = 0;
-        int location = 0;
-        int dwell = 0;
-        int headway;
-        int lastGo = 0;
+        int id; // 編號
+        const int capacity = 60; // 容量
+        float vol = 0; // 速度
+        int pax = 0; // 車上乘客
+        int location = 0; // 位置
+        int dwell = 0; // 累積置站時間
+        int headway; // 發車間距
+        int lastGo = 0; // 上一次駛離站點或號誌的時間
 };
 
 #endif

@@ -7,33 +7,39 @@
 
 using namespace std;
 
-enum TrafficLight { RED, YELLOW, GREEN };
+/* Signal state */
+enum TrafficLight { RED, YELLOW, GREEN }; // 紅燈, 黃燈, 綠燈
 
+/* Data Structure of Signal */
 struct Light {
-    int id;
-    int mileage = 0;
-    string lightName;
-    TrafficLight state = GREEN;
-    int cycleTime;
-    vector<pair<int, TrafficLight>> plan;
-    int offset;
+    int id; //編號
+    int mileage = 0; //位置 (里程)
+    string lightName; //號誌化路口名稱
+    TrafficLight state = GREEN; //燈號
+    int cycleTime; // 週期
+    vector<pair<int, TrafficLight>> plan; // 時制計畫
+    int offset; // 和前一號誌的起始時間偏差
 };
 
+/* Data Structure of Stop */
 struct Stop {
-    int id;
-    bool direction;
-    string stopName;
-    int mileage;
-    int pax = 0;
-    string note;
-    int lastArrive = -1;
+    int id; // 編號
+    bool direction; // 方向
+    string stopName; // 站點名稱
+    int mileage; // 位置 (里程)
+    int pax = 0; // 站上乘客數
+    string note; // 站點備註
+    int lastArrive = -1; // 上輛車抵達的時間
 };
 
+/* Comparator */
 struct eventCmp {
+    /* 為了使 Event 物件在 Event List (priority queue) 中能按照發生先後順序排列而設計之比較器 */
     bool operator()(Event* a, Event* b) { return a->getTime() > b->getTime(); }
 };
 
 struct mileageCmp {
+     /* 為了使 Stop 及 Light 物件在 Route (set) 中能按照里程順序排列而設計之比較器 */
     bool operator()(const variant<Stop*, Light*>& a, const variant<Stop*, Light*>& b) const {
         return visit([](const auto* obj1, const auto* obj2) {
             return obj1->mileage < obj2->mileage; 
@@ -43,52 +49,56 @@ struct mileageCmp {
 
 class System {
     public:
-        System();
+        /* Constructor */
+        System(); 
         System(string routeName);
-        void init(); //also setup event
-        void simulation(); //also trigger event
-        void performance();
-        void readSche(int trial);
 
-        void arriveAtStop(Event* e);
-        void deptFromStop(Event* e);
-        void arriveAtLight(Event* e);
-        void deptFromLight(Event* e);
-        void paxArriveAtStop(Event* e);
+        /* Simulation */
+        void init(); // 初始化函數
+        void simulation(); // 模擬函數
+        void performance(); // 計算績效函數
+        void readSche(int trial); // 讀取班表函數
+
+        /* Event */
+        void arriveAtStop(Event* e); // 抵達站點事件
+        void deptFromStop(Event* e); // 離開站點事件
+        void arriveAtLight(Event* e); // 抵達號誌化路口事件
+        void deptFromLight(Event* e); // 離開號誌化路口事件
+        void paxArriveAtStop(Event* e); // 乘客抵達站點
 
         /*Func*/
-        void incrHeadwayDev(float dev);
-        optional<Stop*> getNextStop(int stopID);
+        void incrHeadwayDev(float dev); // 部分績效計算
+        optional<Stop*> getNextStop(int stopID); // 取得下一站點函數
 
         /*getter*/
-        const int getTmax();
+        const int getTmax(); // 取得最大置站時間
 
     private:
         /*Paramemter*/
-        string routeName;
-        int Tmax = 3 * 60;
-        float Vavg = 25 / 3.6;
-        float Vlimit = 40 / 3.6;
-        float Vlow = 15 / 3.6;
+        string routeName; // 路線名稱
+        int Tmax = 3 * 60; // 最大置站時間 (秒)
+        float Vavg = 25 / 3.6; // 平均速度
+        float Vlimit = 40 / 3.6; // 速限
+        float Vlow = 15 / 3.6; // 最低容許速度
 
         /*Variable*/
-        float headwayDev = 0;
+        float headwayDev = 0; // 績效值: headeay deviation
 
         /*Data Structure*/
-        vector<Bus*> fleet;
-        priority_queue<Event*, vector<Event*>, eventCmp> eventList;
-        set<variant<Stop*, Light*>, mileageCmp> route;
-        map<int, function<void(Event*)>> eventSet;
-        vector<vector<float>> getOn;
-        vector<vector<float>> getOff;
-        vector<int> sche;
-        vector<Light*> lights;
-        vector<Stop*> stops;
+        vector<Bus*> fleet; // 車隊
+        priority_queue<Event*, vector<Event*>, eventCmp> eventList; // 事件列表
+        set<variant<Stop*, Light*>, mileageCmp> route; // 路線 (號誌 + 站點)
+        map<int, function<void(Event*)>> eventSet; // 事件種類集合
+        vector<vector<float>> getOn; // 乘客到達率
+        vector<vector<float>> getOff; // 乘客下車率
+        vector<int> sche; // 班表
+        vector<Light*> lights; // 號誌
+        vector<Stop*> stops; // 站點
 
         /*Function*/
-        optional<Stop*> findNextStop(int stopID);
-        optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target);
-        string showTime(int time);
+        optional<Stop*> findNextStop(int stopID); // 取得下一站點函數
+        optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target); // 取得路線上下一物件
+        string showTime(int time); // 顯示時間函數
 
         
 };
