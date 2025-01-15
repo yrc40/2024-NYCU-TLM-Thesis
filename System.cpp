@@ -1,59 +1,60 @@
 #include "System.hpp"
+#include "toml.hpp"
 #include <iomanip>
 #include <sstream>
 
-System::System() : route(mileageCmp()) {}
-
-System::System(string routeName) : routeName(routeName), route(mileageCmp()) {
-    eventSet[1] = [this](Event* e) { this->arriveAtStop(e); };
-    eventSet[2] = [this](Event* e) { this->deptFromStop(e); };
-    eventSet[3] = [this](Event* e) { this->arriveAtLight(e); };
-    eventSet[4] = [this](Event* e) { this->deptFromLight(e); };
+System::System() : route(mileageCmp()) {
+    /* 初始化一個模擬系統時，自動設定 event set 的 mappingn */
+    eventSet[1] = [this](Event* e) { this->arriveAtStop(e); }; // 事件 1: 公車到站
+    eventSet[2] = [this](Event* e) { this->deptFromStop(e); }; // 事件 2: 公車離站
+    eventSet[3] = [this](Event* e) { this->arriveAtLight(e); }; // 事件 3: 公車到號誌化路口
+    eventSet[4] = [this](Event* e) { this->deptFromLight(e); }; // 事件 4: 公車離開號誌化路口
 }
 
 const int System::getTmax() { return Tmax; }
 
 optional<Stop*> System::getNextStop(int stopID) { return findNextStop(stopID); }
 
-optional<Stop*> System::findNextStop(int stopID) {
-    for (auto it = route.begin(); it != route.end(); ++it) {
-        if (auto* stop = get_if<Stop*>(&*it)) {
-            // cout << "Checking stop with ID: " << (*stop)->id << endl;
-            if ((*stop)->id == stopID) {
-                 // cout << "Found stopID: " << stopID << ". Looking for the next stop." << endl;
+optional<Stop*> System::findNextStop(int stopID) { // 回傳 Optional: 代表可能有空值
+    for (auto it = route.begin(); it != route.end(); ++it) { // 遍歷路線上的元素
+        if (auto* stop = get_if<Stop*>(&*it)) { // 如果抓到一個 stop
+            if ((*stop)->id == stopID) { // 若這個 stop 的編號是函式傳入的 id
                 auto nextIt = next(it);
-                while (nextIt != route.end()) {
-                    if (auto* nextStop = get_if<Stop*>(&*nextIt)) {
-                        // cout << "Found next stop with ID: " << (*nextStop)->id << endl;
-                        return *nextStop;
+                while (nextIt != route.end()) { // 往後遍歷所有元素
+                    if (auto* nextStop = get_if<Stop*>(&*nextIt)) { // 若抓到一個 stop，即為下一站
+                        return *nextStop; // 回傳指向下站元素的指標
                     }
                     ++nextIt;
                 }
-                cout << "No next Stop found after stopID: " << stopID << endl;
-                return nullopt;
+                cout << "No next Stop found after stopID: " << stopID << endl; // 沒有找到下一站
+                return nullopt; // 回傳空指標
             }
         }
     }
-    // cout << "Stop with ID " << stopID << " not found in route." << endl;
-    return nullopt;
+    return nullopt; // 若沒有找到目標車站 (stopID)，回傳空指標
 }
 
-optional<variant<Stop*, Light*>> System::findNext(variant<Stop*, Light*> target) {
-    auto it = route.find(target);
-    it++;
-    if (std::holds_alternative<Stop*>(*it)) {
+/* 尋找路線上下一個元素 */
+optional<variant<Stop*, Light*>> System::findNext(variant<Stop*, Light*> target) { // 回傳 Optional: 代表可能有空值
+    auto it = route.find(target); // 找到目標元素的位置
+    it++; // 位置 +1
+    if (holds_alternative<Stop*>(*it)) { // 若為站點
         Stop* stop = std::get<Stop*>(*it);
         cout << "Find Next Stop ID: " << stop->id << endl;
-    } else if (std::holds_alternative<Light*>(*it)) {
+        return *it; // 回傳指向元素的指標
+    } else if (holds_alternative<Light*>(*it)) { // 若為號誌
         Light* light = std::get<Light*>(*it);
-        cout << "Find Next Light ID: " << light->id << endl;  
+        cout << "Find Next Light ID: " << light->id << endl;
+        return *it; // 回傳指向元素的指標
     }   
-    return *it;
+
+    return nullopt; // 若沒有下一個元素，回傳空指標
 
 }
 
+/* 計算部分績效的函數 */
 void System::incrHeadwayDev(float t) {
-    headwayDev += t;
+    headwayDev += t; // 將績效值加上輸入值 t
 }
 
 string showTime(int time) {
@@ -63,11 +64,59 @@ string showTime(int time) {
     return oss.str();
 }
 
+/* 系統讀取參數的函式 */
 void System::init() {
-    /*TODO: read parameter*/
+    /* 讀取設定檔 */
+    try {
+        auto config = toml::parse_file( "config.toml" );
+
+        /* 讀取站點參數 */
+        this->stopAmount = config["stop"]["amount"].value<int>();
+        this->stopDistAvg = config["stop"]["distAvg"].value<double>();
+        this->stopDistSd = config["stop"]["distSd"].value<double>();
+
+        /* 公車參數 */
+
+    } catch (const toml::parse_error& e) {
+        cerr << "設定檔讀取錯誤：" << e.what() << "\n";
+        exit(1);
+    }
+
+    random_device rd;
+    mt19937 gen(rd());
+
+    /* 產生站點 */
+    normal_distribution<> dist(stopDistAvg.value(), stopDistSd.value());
+    double current_distance = 0.0;
+    for (int i = 1; i <= stopAmount.value(); i++) {
+        Stop* stop = new Stop;
+        stop->id = i;
+        stop->pax = 0;
+
+        if (stop->id == 0) {
+            stop->mileage = 0;
+        } else {
+            double next_distance = std::max(0.0, dist(gen)); 
+            current_distance += next_distance;
+            stop->mileage = current_distance;
+        }
+        route.insert(stop);
+    }
+
+    for (const auto& element : route) {
+        visit([](auto&& obj) {
+            using T = decay_t<decltype(obj)>;
+            if constexpr (is_same_v<T, Stop*>) {
+                cout << "Stop ID: " << obj->id << endl;
+            } else if constexpr (std::is_same_v<T, Light*>) {
+                cout << "Light ID: " << obj->id << endl;
+            }
+        }, element);
+    }
+
     string line;
-    /*Read Stops*/
-    ifstream file( "./data/" + routeName + ".csv");
+   
+    /*ifstream file( "./data/" + routeName + ".csv");
     
     getline(file, line);
     while (getline(file, line)) {
@@ -98,7 +147,7 @@ void System::init() {
         //if (stop->id == 1 || stop->id == 2 || stop->id == 3) 
         route.insert(stop);
     }
-    file.close();
+    file.close();*/
 
     /*Read Lights*/
     
@@ -507,6 +556,7 @@ void System::deptFromStop(Event* e) {
     }
 
     /*Find next event*/
+    if (stop->id == this->stopAmount.value()) return;
     auto nextElement = findNext(stop);
     if(nextElement.has_value()) {
         visit([&](auto* obj) {
@@ -738,4 +788,17 @@ void System::performance() {
     cout << "Each line consists of 31 stop.\n"; 
     cout << "Total heawdway deviation: " << this->headwayDev / 1;
     cout << "\nAvg headway deviation: " << this->headwayDev /(fleet.size() - 1);
+}
+
+void  System::showRoute() {
+     for (const auto& element : this->route) {
+        visit([](auto&& obj) {
+            using T = decay_t<decltype(obj)>;
+            if constexpr (is_same_v<T, Stop*>) {
+                cout << "Stop ID: " << obj->id << endl;
+            } else if constexpr (std::is_same_v<T, Light*>) {
+                cout << "Light ID: " << obj->id << endl;
+            }
+        }, element);
+    }
 }

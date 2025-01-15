@@ -51,20 +51,12 @@ class System {
     public:
         /* Constructor */
         System(); 
-        System(string routeName);
 
         /* Simulation */
         void init(); // 初始化函數
         void simulation(); // 模擬函數
         void performance(); // 計算績效函數
         void readSche(int trial); // 讀取班表函數
-
-        /* Event */
-        void arriveAtStop(Event* e); // 抵達站點事件
-        void deptFromStop(Event* e); // 離開站點事件
-        void arriveAtLight(Event* e); // 抵達號誌化路口事件
-        void deptFromLight(Event* e); // 離開號誌化路口事件
-        void paxArriveAtStop(Event* e); // 乘客抵達站點
 
         /*Func*/
         void incrHeadwayDev(float dev); // 部分績效計算
@@ -80,6 +72,9 @@ class System {
         float Vavg = 25 / 3.6; // 平均速度
         float Vlimit = 40 / 3.6; // 速限
         float Vlow = 15 / 3.6; // 最低容許速度
+        optional<int> stopAmount;
+        optional<double> stopDistAvg;
+        optional<double> stopDistSd;
 
         /*Variable*/
         float headwayDev = 0; // 績效值: headeay deviation
@@ -99,6 +94,13 @@ class System {
         optional<Stop*> findNextStop(int stopID); // 取得下一站點函數
         optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target); // 取得路線上下一物件
         string showTime(int time); // 顯示時間函數
+        void showRoute(); // 印出路線上的元素
+
+        /* Event */
+        void arriveAtStop(Event* e); // 抵達站點事件
+        void deptFromStop(Event* e); // 離開站點事件
+        void arriveAtLight(Event* e); // 抵達號誌化路口事件
+        void deptFromLight(Event* e); // 離開號誌化路口事件
 
         
 };
