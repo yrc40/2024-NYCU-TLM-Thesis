@@ -1,5 +1,17 @@
+[scheme]
+version = 1
+
 [stop]
-amount = 31
 distAvg = 350
 distSd = 70
+
+[signal]
+distAvg = 250
+distSd = 30
+
+[schedule]
+startTime = "0000"
+endTime = "0100"
+intervalAvg = 5
+sd = 1
 

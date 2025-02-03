@@ -70,37 +70,16 @@ void System::init() {
     try {
         auto config = toml::parse_file( "config.toml" );
 
-        /* 讀取站點參數 */
-        this->stopAmount = config["stop"]["amount"].value<int>();
+        /* 讀取站點參數及站點檔案 */
         this->stopDistAvg = config["stop"]["distAvg"].value<double>();
         this->stopDistSd = config["stop"]["distSd"].value<double>();
+        this->setupStop(this->stopDistAvg.value(), this->stopDistSd.value());
 
         /* 公車參數 */
 
     } catch (const toml::parse_error& e) {
         cerr << "設定檔讀取錯誤：" << e.what() << "\n";
         exit(1);
-    }
-
-    random_device rd;
-    mt19937 gen(rd());
-
-    /* 產生站點 */
-    normal_distribution<> dist(stopDistAvg.value(), stopDistSd.value());
-    double current_distance = 0.0;
-    for (int i = 1; i <= stopAmount.value(); i++) {
-        Stop* stop = new Stop;
-        stop->id = i;
-        stop->pax = 0;
-
-        if (stop->id == 0) {
-            stop->mileage = 0;
-        } else {
-            double next_distance = std::max(0.0, dist(gen)); 
-            current_distance += next_distance;
-            stop->mileage = current_distance;
-        }
-        route.insert(stop);
     }
 
     for (const auto& element : route) {
@@ -253,6 +232,61 @@ void System::init() {
         );
         eventList.push(newEvent);
     }
+
+}
+
+void System::setupStop(double avg, double sd) {
+    /*讀取站點資訊檔案 (stops.csv) 並生成符合輸入分佈的站距*/
+    string line;
+    double current_distance = 0.0;
+    random_device rd;
+    mt19937 gen(rd());
+    this->stopAmount = 0;
+    ifstream file( "./data/stops.csv");
+
+    double tmpAvg, tmpSd;
+    
+    getline(file, line); // 跳過 csv 檔標頭
+    while (getline(file, line)) { // 逐行讀取
+        stringstream ss(line);
+        string field;
+        string dummy;
+        Stop* stop = new Stop;
+
+        getline(ss, field, ',');
+        stop->id = stoi(field);
+
+        getline(ss, field, ',');
+        stop->stopName = field;
+
+        for (int i = 0; i < 3; i++) {
+            getline(ss, field, ',');
+            tmpAvg = stod(field);
+            getline(ss, field, ',');
+            tmpSd = stod(field);
+            stop->arrivalRate[i] = make_pair(tmpAvg, tmpSd);
+        }
+
+        for (int i = 0; i < 3; i++) {
+            getline(ss, field, ',');
+            tmpAvg = stod(field);
+            getline(ss, field, ',');
+            tmpSd = stod(field);
+            stop->dropRate[i] = make_pair(tmpAvg, tmpSd);
+        }
+
+        normal_distribution<> dist(avg, sd);
+        if (stop->id == 0) {
+            stop->mileage = 0;
+        } else {
+            double next_distance = std::max(0.0, dist(gen)); 
+            current_distance += next_distance;
+            stop->mileage = current_distance;
+        }
+        route.insert(stop);
+        this->stopAmount++;
+    }
+    file.close();
 
 }
 
@@ -556,7 +590,7 @@ void System::deptFromStop(Event* e) {
     }
 
     /*Find next event*/
-    if (stop->id == this->stopAmount.value()) return;
+    if (stop->id == this->stopAmount) return;
     auto nextElement = findNext(stop);
     if(nextElement.has_value()) {
         visit([&](auto* obj) {

@@ -30,6 +30,8 @@ struct Stop {
     int pax = 0; // 站上乘客數
     string note; // 站點備註
     int lastArrive = -1; // 上輛車抵達的時間
+    array<pair<double, double>, 3> arrivalRate;
+    array<pair<double, double>, 3> dropRate;
 };
 
 /* Comparator */
@@ -72,7 +74,7 @@ class System {
         float Vavg = 25 / 3.6; // 平均速度
         float Vlimit = 40 / 3.6; // 速限
         float Vlow = 15 / 3.6; // 最低容許速度
-        optional<int> stopAmount;
+        int stopAmount;
         optional<double> stopDistAvg;
         optional<double> stopDistSd;
 
@@ -95,6 +97,7 @@ class System {
         optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target); // 取得路線上下一物件
         string showTime(int time); // 顯示時間函數
         void showRoute(); // 印出路線上的元素
+        void setupStop(double avg, double sd);
 
         /* Event */
         void arriveAtStop(Event* e); // 抵達站點事件
