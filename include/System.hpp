@@ -3,6 +3,7 @@
 
 #include "Event.hpp"
 #include "Bus.hpp"
+#include "Plan.hpp"
 #include<bits/stdc++.h>
 
 using namespace std;
@@ -17,8 +18,9 @@ struct Light {
     string lightName; //號誌化路口名稱
     TrafficLight state = GREEN; //燈號
     int cycleTime; // 週期
-    vector<pair<int, TrafficLight>> plan; // 時制計畫
+    //vector<pair<int, TrafficLight>> plan; // 時制計畫
     int offset; // 和前一號誌的起始時間偏差
+    Plan plan;
 };
 
 /* Data Structure of Stop */
@@ -71,12 +73,15 @@ class System {
         /*Paramemter*/
         string routeName; // 路線名稱
         int Tmax = 3 * 60; // 最大置站時間 (秒)
-        float Vavg = 25 / 3.6; // 平均速度
-        float Vlimit = 40 / 3.6; // 速限
-        float Vlow = 15 / 3.6; // 最低容許速度
+        double Vavg = 25 / 3.6; // 平均速度
+        double Vsd =  7 / 3.6;
+        double Vlimit = 40 / 3.6; // 速限
+        double Vlow = 15 / 3.6; // 最低容許速度
         int stopAmount;
         optional<double> stopDistAvg;
         optional<double> stopDistSd;
+        optional<double> signalDistAvg;
+        optional<double> signalDistSd;
 
         /*Variable*/
         float headwayDev = 0; // 績效值: headeay deviation
@@ -98,6 +103,7 @@ class System {
         string showTime(int time); // 顯示時間函數
         void showRoute(); // 印出路線上的元素
         void setupStop(double avg, double sd);
+        void setupSignal(double avg, double sd);
 
         /* Event */
         void arriveAtStop(Event* e); // 抵達站點事件

@@ -1,5 +1,6 @@
-[scheme]
-version = 1
+[general]
+scheme = 1
+route = "307"
 
 [stop]
 distAvg = 350
@@ -14,4 +15,11 @@ startTime = "0000"
 endTime = "0100"
 intervalAvg = 5
 sd = 1
+
+[velocity]
+avg = 25
+sd = 7
+limit = 40
+low = 15
+
 

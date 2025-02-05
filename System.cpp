@@ -4,7 +4,7 @@
 #include <sstream>
 
 System::System() : route(mileageCmp()) {
-    /* 初始化一個模擬系統時，自動設定 event set 的 mappingn */
+    /* 初始化一個模擬系統時，自動設定 event set 的 mapping */
     eventSet[1] = [this](Event* e) { this->arriveAtStop(e); }; // 事件 1: 公車到站
     eventSet[2] = [this](Event* e) { this->deptFromStop(e); }; // 事件 2: 公車離站
     eventSet[3] = [this](Event* e) { this->arriveAtLight(e); }; // 事件 3: 公車到號誌化路口
@@ -64,23 +64,28 @@ string showTime(int time) {
     return oss.str();
 }
 
-/* 系統讀取參數的函式 */
+/* 模擬系統讀取參數並生成必要元素的函式 */
 void System::init() {
     /* 讀取設定檔 */
     try {
-        auto config = toml::parse_file( "config.toml" );
+        auto config = toml::parse_file( "config.toml" ); // 讀取 general 設定檔
 
         /* 讀取站點參數及站點檔案 */
         this->stopDistAvg = config["stop"]["distAvg"].value<double>();
         this->stopDistSd = config["stop"]["distSd"].value<double>();
         this->setupStop(this->stopDistAvg.value(), this->stopDistSd.value());
 
-        /* 公車參數 */
+        /* 讀取號誌參數及號誌描述檔 */
+        this->signalDistAvg = config["signal"]["distAvg"].value<double>();
+        this->signalDistSd = config["signal"]["distSd"].value<double>();
+        this->setupSignal(this->signalDistAvg.value(), this->signalDistSd.value());
 
     } catch (const toml::parse_error& e) {
         cerr << "設定檔讀取錯誤：" << e.what() << "\n";
         exit(1);
     }
+
+    string line;
 
     for (const auto& element : route) {
         visit([](auto&& obj) {
@@ -92,77 +97,6 @@ void System::init() {
             }
         }, element);
     }
-
-    string line;
-   
-    /*ifstream file( "./data/" + routeName + ".csv");
-    
-    getline(file, line);
-    while (getline(file, line)) {
-        stringstream ss(line);
-        string field;
-        string dummy;
-        Stop* stop = new Stop;
-
-        std::getline(ss, field, ',');
-        stop->id = std::stoi(field);
-
-        std::getline(ss, dummy, ',');
-        std::getline(ss, field, ',');
-        stop->direction = (field == "1");
-
-        std::getline(ss, field, ',');
-        stop->stopName = field;
-
-        std::getline(ss, dummy, ',');
-        std::getline(ss, dummy, ',');
-        std::getline(ss, field, ',');
-        stop->note = field;
-
-        std::getline(ss, field, ',');
-        stop->mileage = std::stoi(field);
-        stop->pax = 0; 
-
-        //if (stop->id == 1 || stop->id == 2 || stop->id == 3) 
-        route.insert(stop);
-    }
-    file.close();*/
-
-    /*Read Lights*/
-    
-    ifstream file2( "./data/light307.csv");
-    getline(file2, line);
-    string field;
-    while (getline(file2, line)) {
-
-        stringstream ss(line);
-        Light* light = new Light;
-        string field;
-
-        std::getline(ss, field, ',');
-        light->id = stoi(field);
-
-        std::getline(ss, field, ',');
-        light->lightName = field;
-
-        std::getline(ss, field, ',');
-        light->mileage = stoi(field);
-
-        //if (light->id == 1 || light->id == 2 || light->id == 3 || light->id == 4) 
-        route.insert(light);
-    }
-    file2.close();
-
-    /*for (const auto& element : route) {
-        visit([](auto&& obj) {
-            using T = decay_t<decltype(obj)>;
-            if constexpr (is_same_v<T, Stop*>) {
-                cout << "Stop ID: " << obj->id << endl;
-            } else if constexpr (std::is_same_v<T, Light*>) {
-                cout << "Light ID: " << obj->id << endl;
-            }
-        }, element);
-    }*/
 
     /*Read get on rate*/
     ifstream file3("./data/getOn.csv");
@@ -242,6 +176,7 @@ void System::setupStop(double avg, double sd) {
     random_device rd;
     mt19937 gen(rd());
     this->stopAmount = 0;
+    int id = 0;
     ifstream file( "./data/stops.csv");
 
     double tmpAvg, tmpSd;
@@ -254,7 +189,7 @@ void System::setupStop(double avg, double sd) {
         Stop* stop = new Stop;
 
         getline(ss, field, ',');
-        stop->id = stoi(field);
+        stop->id = id;
 
         getline(ss, field, ',');
         stop->stopName = field;
@@ -285,10 +220,51 @@ void System::setupStop(double avg, double sd) {
         }
         route.insert(stop);
         this->stopAmount++;
+        id++;
     }
     file.close();
-
 }
+
+void System::setupSignal(double avg, double sd) {
+    /*讀取號誌資訊檔案 (signals.csv) 並生成符合輸入分佈的站距*/
+    string line;
+    double current_distance = 0.0;
+    int id;
+    random_device rd;
+    mt19937 gen(rd());
+    ifstream file( "./data/signals.csv");
+
+    double tmpAvg, tmpSd;
+    getline(file, line); // 跳過 csv 檔標頭
+    while (getline(file, line)) { // 逐行讀取
+        stringstream ss(line);
+        string field;
+        string dummy;
+        Light* light = new Light;
+
+        getline(ss, field, ',');
+        light->id = id;
+
+        getline(ss, field, ',');
+        light->lightName = field;
+
+        getline(ss, field);
+        light->plan.setPhase(field);
+
+        normal_distribution<> dist(avg, sd);
+        if (light->id == 0) {
+            light->mileage = 0;
+        } else {
+            double next_distance = std::max(0.0, dist(gen)); 
+            current_distance += next_distance;
+            light->mileage = current_distance;
+        }
+        route.insert(light);
+        id++;
+    }
+    file.close();
+}
+
 
 void System::readSche(int trial) {
 
