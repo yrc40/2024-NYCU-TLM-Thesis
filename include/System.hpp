@@ -82,11 +82,15 @@ class System {
         optional<double> stopDistSd;
         optional<double> signalDistAvg;
         optional<double> signalDistSd;
+        optional<int> scheStart;
+        optional<int> shift;
+        optional<double> scheAvg;
+        optional<double> scheSd;
 
         /*Variable*/
         float headwayDev = 0; // 績效值: headeay deviation
 
-        /*Data Structure*/
+        /*Data Structures*/
         vector<Bus*> fleet; // 車隊
         priority_queue<Event*, vector<Event*>, eventCmp> eventList; // 事件列表
         set<variant<Stop*, Light*>, mileageCmp> route; // 路線 (號誌 + 站點)
@@ -94,8 +98,6 @@ class System {
         vector<vector<float>> getOn; // 乘客到達率
         vector<vector<float>> getOff; // 乘客下車率
         vector<int> sche; // 班表
-        vector<Light*> lights; // 號誌
-        vector<Stop*> stops; // 站點
 
         /*Function*/
         optional<Stop*> findNextStop(int stopID); // 取得下一站點函數
@@ -104,6 +106,8 @@ class System {
         void showRoute(); // 印出路線上的元素
         void setupStop(double avg, double sd);
         void setupSignal(double avg, double sd);
+        void setupSche(int start, double avg, double sd, int shift);
+        int time2Seconds(const string& timeStr); 
 
         /* Event */
         void arriveAtStop(Event* e); // 抵達站點事件

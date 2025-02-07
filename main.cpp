@@ -9,7 +9,7 @@ int main() {
     System system;
     cout << ">>> Simulation for 307 莒光往板橋前站 <<<\n";
 
-    system.readSche(0);
+    //system.readSche(0);
     system.init();
     system.simulation();
     system.performance();

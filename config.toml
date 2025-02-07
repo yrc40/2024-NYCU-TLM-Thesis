@@ -13,8 +13,9 @@ distSd = 30
 [schedule]
 startTime = "0000"
 endTime = "0100"
-intervalAvg = 5
+avg = 5
 sd = 1
+shift = 12
 
 [velocity]
 avg = 25

@@ -64,6 +64,12 @@ string showTime(int time) {
     return oss.str();
 }
 
+int System::time2Seconds(const string& timeStr) {
+    int hours = stoi(timeStr.substr(0, 2));
+    int minutes = stoi(timeStr.substr(2, 2));
+    return hours * 3600 + minutes * 60;
+}
+
 /* 模擬系統讀取參數並生成必要元素的函式 */
 void System::init() {
     /* 讀取設定檔 */
@@ -79,6 +85,18 @@ void System::init() {
         this->signalDistAvg = config["signal"]["distAvg"].value<double>();
         this->signalDistSd = config["signal"]["distSd"].value<double>();
         this->setupSignal(this->signalDistAvg.value(), this->signalDistSd.value());
+
+        /*讀取班表分佈參數並產生班表*/
+        auto startTimeOpt = config["schedule"]["startTime"].value<string>();
+        if (!startTimeOpt) throw runtime_error("錯誤: TOML 描述檔缺少 'schedule.startTime' 欄位");
+        this->scheStart = time2Seconds(*startTimeOpt);
+
+        this->shift = config["schedule"]["shift"].value<int>();
+        this->scheAvg = config["schedule"]["avg"].value<double>();
+        this->scheAvg.value() *= 60;
+        this->scheSd = config["schedule"]["sd"].value<double>();
+        this->scheSd.value() *= 60;
+        this->setupSche(this->scheStart.value(), this->scheAvg.value(), this->scheSd.value(), this->shift.value());
 
     } catch (const toml::parse_error& e) {
         cerr << "設定檔讀取錯誤：" << e.what() << "\n";
@@ -97,6 +115,11 @@ void System::init() {
             }
         }, element);
     }
+
+    /*for (int i = 0; i < sche.size(); i++) {
+        cout << this->sche[i] << " ";
+    }
+    cout << endl;*/
 
     /*Read get on rate*/
     ifstream file3("./data/getOn.csv");
@@ -144,28 +167,6 @@ void System::init() {
     }
     file4.close();
 
-    /*Read fleet and first departure*/
-    for(int i = 0; i < sche.size(); i++) {
-        if(i == 0) {
-            Bus* newBus = new Bus(0, 300);
-            // newBus->setPax((300 * getOn[0][0]) > newBus->getCapacity() ? newBus->getCapacity() : 300 * getOn[0][0]);
-            fleet.push_back(newBus);
-
-        } else {
-            int hdwy = sche[i] - sche[i-1];
-            Bus* newBus = new Bus(i, hdwy);
-            // newBus->setPax((hdwy * getOn[0][0]) > newBus->getCapacity() ? newBus->getCapacity() : hdwy * getOn[0][0]);
-            fleet.push_back(newBus);
-        }
-        Event* newEvent = new Event( 
-            sche[i], //time
-            i, //bus
-            1, //event
-            1, //stopid
-            1
-        );
-        eventList.push(newEvent);
-    }
 
 }
 
@@ -175,6 +176,7 @@ void System::setupStop(double avg, double sd) {
     double current_distance = 0.0;
     random_device rd;
     mt19937 gen(rd());
+    normal_distribution<> dist(avg, sd);
     this->stopAmount = 0;
     int id = 0;
     ifstream file( "./data/stops.csv");
@@ -210,7 +212,6 @@ void System::setupStop(double avg, double sd) {
             stop->dropRate[i] = make_pair(tmpAvg, tmpSd);
         }
 
-        normal_distribution<> dist(avg, sd);
         if (stop->id == 0) {
             stop->mileage = 0;
         } else {
@@ -255,7 +256,7 @@ void System::setupSignal(double avg, double sd) {
         if (light->id == 0) {
             light->mileage = 0;
         } else {
-            double next_distance = std::max(0.0, dist(gen)); 
+            double next_distance = max(0.0, dist(gen)); 
             current_distance += next_distance;
             light->mileage = current_distance;
         }
@@ -265,6 +266,33 @@ void System::setupSignal(double avg, double sd) {
     file.close();
 }
 
+void System::setupSche(int startTime, double avg, double sd, int shift) {
+    int currentTime = startTime, hdwy = 0;
+    random_device rd;
+    mt19937 gen(rd());
+    normal_distribution<> dist(avg, sd);
+
+
+    for(int i = 0; i < this->shift.value(); i++) {
+        hdwy = abs(dist(gen));
+        if(i > 0) {
+            currentTime += hdwy;
+        }
+        this->sche.push_back(currentTime);
+
+        Bus* newBus = new Bus(i, hdwy);
+        fleet.push_back(newBus);
+
+        Event* newEvent = new Event( 
+            this->sche[i], //time
+            i, //bus
+            1, //event
+            0, //stopid
+            1
+        );
+        eventList.push(newEvent);
+    }
+}
 
 void System::readSche(int trial) {
 
@@ -307,8 +335,8 @@ void System::arriveAtStop(Event* e) {
     cout << "New Event: Bus " << e->getBusID() << " arrive at stop " << e->getStopID() << "\n";
 
     /*Get arrive rate and drop rate*/
-    float arriveRate = getOn[(e->getStopID()) - 1][0];
-    float dropRate = getOff[(e->getStopID()) - 1][0];
+    float arriveRate = getOn[(e->getStopID())][0];
+    float dropRate = getOff[(e->getStopID())][0];
 
     int busID = e->getBusID();
     Bus* bus = nullptr;
@@ -462,8 +490,8 @@ void System::deptFromStop(Event* e) {
 
     /*Calculate scheme*/
     if (nextStop.has_value()) {
-        float arriveRate = getOn[(nextStop.value()->id) - 1][0];
-        float dropRate = getOff[(nextStop.value()->id) - 1][0];
+        float arriveRate = getOn[(nextStop.value()->id)][0];
+        float dropRate = getOff[(nextStop.value()->id)][0];
         cout << "Next stop is: " << nextStop.value()->id << " " << nextStop.value()->stopName << "\n";
         int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
         int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
