@@ -86,6 +86,8 @@ class System {
         optional<int> shift;
         optional<double> scheAvg;
         optional<double> scheSd;
+        pair<int, int> morningPeak;
+        pair<int, int> eveningPeak;
 
         /*Variable*/
         float headwayDev = 0; // 績效值: headeay deviation
@@ -102,12 +104,24 @@ class System {
         /*Function*/
         optional<Stop*> findNextStop(int stopID); // 取得下一站點函數
         optional<variant<Stop*, Light*>> findNext(variant<Stop*, Light*> target); // 取得路線上下一物件
-        string showTime(int time); // 顯示時間函數
+        void printFormattedTime(int time); // 顯示時間函數
+        void printEventDetails(Event* e);
         void showRoute(); // 印出路線上的元素
         void setupStop(double avg, double sd);
         void setupSignal(double avg, double sd);
         void setupSche(int start, double avg, double sd, int shift);
         int time2Seconds(const string& timeStr); 
+        pair<int, int> timeRange2Pair(const string& timeRange);
+        void displayRoute();
+        double getArrivalRate(int time, Stop* stop);
+        double getDropRate(int time, Stop* stop);
+        Bus* findPrevBus(Bus* target);
+        Bus* findBus(int id);
+        Stop* findStop(int id);
+        Light* findSignal(int id);
+        void handlingPax(Bus* bus, Stop* stop, double arr, double drop);
+        void sortedFleet();
+        void eventPerformance(Event* e, Stop* stop, Bus* bus);  
 
         /* Event */
         void arriveAtStop(Event* e); // 抵達站點事件

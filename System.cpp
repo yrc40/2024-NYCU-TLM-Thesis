@@ -9,6 +9,8 @@ System::System() : route(mileageCmp()) {
     eventSet[2] = [this](Event* e) { this->deptFromStop(e); }; // 事件 2: 公車離站
     eventSet[3] = [this](Event* e) { this->arriveAtLight(e); }; // 事件 3: 公車到號誌化路口
     eventSet[4] = [this](Event* e) { this->deptFromLight(e); }; // 事件 4: 公車離開號誌化路口
+
+    cout << "Start simulation process\n";
 }
 
 const int System::getTmax() { return Tmax; }
@@ -52,29 +54,152 @@ optional<variant<Stop*, Light*>> System::findNext(variant<Stop*, Light*> target)
 
 }
 
-/* 計算部分績效的函數 */
 void System::incrHeadwayDev(float t) {
     headwayDev += t; // 將績效值加上輸入值 t
 }
 
-string showTime(int time) {
-    ostringstream oss;
-    oss << setw(2) << setfill('0') << time / 3600 << ":"
-        << setw(2) << setfill('0') << (time % 3600) / 60;
-    return oss.str();
+void System::printFormattedTime(int seconds) {
+/**
+ * @brief 格式化輸出時間（以 HH:MM:SS 方式顯示）
+ * @param seconds 時間（以秒為單位）
+ */   
+    cout << setw(2) << setfill('0') << seconds / 3600 << ":" 
+         << setw(2) << setfill('0') << (seconds % 3600) / 60 << ":" 
+         << setw(2) << setfill('0') << seconds % 60;
 }
 
+void System::printEventDetails(Event* e) {
+/**
+ * @brief 印出公車事件的詳細資訊
+ * 
+ * 此函式會格式化並輸出事件資訊，包括時間、公車 ID、到達或離開的狀態，以及對應的地點（站牌或號誌）。
+ * 
+ * @param e 指向事件物件的指標，包含事件的時間、類型、公車 ID、站牌或號誌 ID
+ * 
+ * @note 事件類型 (`getEventType()`) 的對應關係：
+ *       - 0: 公車到達站牌
+ *       - 1: 公車離開站牌
+ *       - 2: 公車到達號誌
+ *       - 3: 公車離開號誌
+ * 
+ * @see System::printFormattedTime(int) 用於格式化時間輸出
+ */
+    const char* arrivalStatus[] = { " arrived at ", " departed from ", " arrived at ", " departed from " };
+    const char* locationType[] = { "stop ", "stop ", "signal ", "signal "};
+
+    cout << "\nTime: ";
+    printFormattedTime(e->getTime());
+    cout << "\n";
+
+    cout << "New Event: Bus " << e->getBusID() 
+         << arrivalStatus[e->getEventType() - 1]
+         << locationType[e->getEventType() - 1];
+    if (e->getEventType() == 1 || e->getEventType() == 2) {
+        cout << e->getStopID() << "\n\n";
+    } else {
+        cout << e->getLightID() << "\n\n";
+    }
+}
+
+
 int System::time2Seconds(const string& timeStr) {
+/**
+ * @brief 將時間字串轉換為對應的秒數
+ * 
+ * @param timeStr 時間字串，格式應為 "HHMM"（24 小時制）
+ * @return int 轉換後的總秒數（從 00:00 開始計算）
+ * @throws runtime_error 當輸入格式錯誤或長度不符時拋出異常
+ */
+
+    if (timeStr.length() != 4) {
+        throw runtime_error("時間字串，格式應為 \"HHMM\"（24 小時制）");
+    }
     int hours = stoi(timeStr.substr(0, 2));
     int minutes = stoi(timeStr.substr(2, 2));
+
     return hours * 3600 + minutes * 60;
 }
 
-/* 模擬系統讀取參數並生成必要元素的函式 */
+pair<int, int> System::timeRange2Pair(const string& timeStr){
+/**
+ * @brief 解析時間範圍字串，例如 "1830-1900" 或 "1800"，輸入一個數字時為該小時內的 0 分至 59 分
+ * 
+ * @param  timeStr 時間字串，格式可以是 "HHMM-HHMM" 或 "HHMM"
+ * @return pair<int, int> 解析後的時間範圍 (開始時間, 結束時間)
+ * @throws runtime_error 當格式錯誤時拋出異常
+ */
+    size_t dashPos = timeStr.find('-'); // 查找 "-" 的位置
+
+    if (dashPos == string::npos) { 
+        // **[情況 1]** 沒有 "-"，代表單一小時，例如 "1800"
+        
+        // 確保時間字串長度為 4，且全為數字
+        if (timeStr.size() != 4 || !all_of(timeStr.begin(), timeStr.end(), ::isdigit)) {
+            throw runtime_error("時間格式錯誤: " + timeStr);
+        }
+
+        int time = stoi(timeStr); // 轉換為整數
+        return {time, time + 59*60}; // 回傳 (開始時間, 結束時間) 一樣
+    } else { 
+        // **[情況 2]** 有 "-"，代表時間範圍，例如 "1830-1900"
+
+        string startStr = timeStr.substr(0, dashPos);    // 擷取開始時間
+        string endStr = timeStr.substr(dashPos + 1);     // 擷取結束時間
+
+        // 檢查長度與格式
+        if (startStr.size() != 4 || endStr.size() != 4 || 
+            !all_of(startStr.begin(), startStr.end(), ::isdigit) ||
+            !all_of(endStr.begin(), endStr.end(), ::isdigit)) {
+            throw runtime_error("時間範圍格式錯誤: " + timeStr);
+        }
+
+        int startTime = time2Seconds(startStr); // 轉換開始時間
+        int endTime = time2Seconds(endStr);     // 轉換結束時間
+
+        // 檢查開始時間不能大於結束時間
+        if (startTime > endTime) {
+            throw runtime_error("時間範圍錯誤，開始時間不能大於結束時間: " + timeStr);
+        }
+
+        return {startTime, endTime}; // 回傳解析後的時間範圍
+    }
+}
+
+void System::displayRoute() {
+/**
+ * @brief 顯示系統中的路線資訊
+ * 
+ * 遍歷 `this->route` 容器，並根據元素的類型 (`Stop*` 或 `Light*`) 顯示對應的 ID。
+ * `route` 容器中存儲的是 `std::variant<Stop*, Light*>`，因此使用 `std::visit` 來處理不同類型的物件。
+ */
+    for (const auto& element : this->route) {
+        visit([](auto&& obj) {
+            using T = decay_t<decltype(obj)>;
+            if constexpr (is_same_v<T, Stop*>) {
+                cout << "Stop ID: " << obj->id << endl;
+            } else if constexpr (std::is_same_v<T, Light*>) {
+                cout << "Signal ID: " << obj->id << endl;
+            }
+        }, element);
+    }
+}
+
 void System::init() {
     /* 讀取設定檔 */
     try {
         auto config = toml::parse_file( "config.toml" ); // 讀取 general 設定檔
+
+        /* 讀取路線基本資料 */
+        this->routeName = config["general"]["route"].value_or("Testcase");
+
+        auto peakOpt = config["general"]["morningPeak"].value<string>();
+        if (!peakOpt) throw runtime_error("錯誤: TOML 描述檔缺少 'general.morningPeak' 欄位");
+        this->morningPeak = timeRange2Pair(*peakOpt);
+
+        peakOpt = config["general"]["eveningPeak"].value<string>();
+        if (!peakOpt) throw runtime_error("錯誤: TOML 描述檔缺少 'general.eveningPeak' 欄位");
+        this->eveningPeak = timeRange2Pair(*peakOpt);
+        
 
         /* 讀取站點參數及站點檔案 */
         this->stopDistAvg = config["stop"]["distAvg"].value<double>();
@@ -105,21 +230,7 @@ void System::init() {
 
     string line;
 
-    for (const auto& element : route) {
-        visit([](auto&& obj) {
-            using T = decay_t<decltype(obj)>;
-            if constexpr (is_same_v<T, Stop*>) {
-                cout << "Stop ID: " << obj->id << endl;
-            } else if constexpr (std::is_same_v<T, Light*>) {
-                cout << "Light ID: " << obj->id << endl;
-            }
-        }, element);
-    }
-
-    /*for (int i = 0; i < sche.size(); i++) {
-        cout << this->sche[i] << " ";
-    }
-    cout << endl;*/
+    this->displayRoute();
 
     /*Read get on rate*/
     ifstream file3("./data/getOn.csv");
@@ -198,9 +309,9 @@ void System::setupStop(double avg, double sd) {
 
         for (int i = 0; i < 3; i++) {
             getline(ss, field, ',');
-            tmpAvg = stod(field);
+            tmpAvg = stod(field) / 3600;
             getline(ss, field, ',');
-            tmpSd = stod(field);
+            tmpSd = stod(field) / 3600;
             stop->arrivalRate[i] = make_pair(tmpAvg, tmpSd);
         }
 
@@ -215,7 +326,7 @@ void System::setupStop(double avg, double sd) {
         if (stop->id == 0) {
             stop->mileage = 0;
         } else {
-            double next_distance = std::max(0.0, dist(gen)); 
+            double next_distance = max(0.0, dist(gen)); 
             current_distance += next_distance;
             stop->mileage = current_distance;
         }
@@ -227,7 +338,7 @@ void System::setupStop(double avg, double sd) {
 }
 
 void System::setupSignal(double avg, double sd) {
-    /*讀取號誌資訊檔案 (signals.csv) 並生成符合輸入分佈的站距*/
+    /* 讀取號誌資訊檔案 (signals.csv) 並生成符合輸入分佈的站距 */
     string line;
     double current_distance = 0.0;
     int id;
@@ -294,147 +405,324 @@ void System::setupSche(int startTime, double avg, double sd, int shift) {
     }
 }
 
-void System::readSche(int trial) {
+Bus* System::findPrevBus(Bus* target) {
+/**
+ * @brief 查找目標公車 (target) 在車隊中的前一輛公車
+ * 
+ * 這個函式會根據公車的位置 (`getLocation()`) 排序車隊 (`fleet`)，
+ * 然後遍歷車隊尋找目標公車 (`target`) 前方的那輛公車。
+ * 
+ * @param target 目標公車 (欲查找前一輛公車的對象)
+ * @return Bus* 若找到前一輛公車，則回傳該公車指標；若目標公車為第一輛，則回傳 nullptr
+ */
+    // 先依照公車位置小到大排序，確保順序正確
+    sort(this->fleet.begin(), this->fleet.end(), [](Bus* a, Bus* b) {
+        return a->getLocation() < b->getLocation();
+    });
 
-    ifstream file5("./data/sche.csv");
-    string line;
-    for(int i=0; i<=trial; i++) {
-        getline(file5, line);
-    }
-
-    int time, hours, minutes;
-    stringstream ss(line);
-    string field;
-
-    while (std::getline(ss, field, ',')) {
-        string ans = "";
-        for (auto &c : field) {
-            if(c < '0' || c > '9') {
-                continue;
-            } else {
-                ans += c;
-            }
-        }
-
-        try {
-            time = stoi(ans);
-            sche.push_back(time);
-        } catch (const std::invalid_argument& e) {
-            std::cerr << "\nInvalid argument: " << e.what() << std::endl;
-        } catch (const std::out_of_range& e) {
-            std::cerr << "Out of range: " << e.what() << std::endl;
+    // 遍歷車隊，找到第一輛比 `target` 位置更大的公車
+    for (auto it = fleet.begin(); it != fleet.end(); ++it) {
+        if ((*it)->getLocation() > target->getLocation()) {
+               return *it; 
         }
     }
-    file5.close();
+    // 若沒有找到比 `target` 位置更大的公車，回傳 nullptr
+    return nullptr;
+} 
+
+double System::getArrivalRate(int time, Stop* stop) {
+/**
+ * @brief 根據時間與站點的到達率計算公車的隨機到達率
+ * 
+ * 此函式會依據給定的時間 (`time`)，判斷當前時段屬於
+ * 早高峰、晚高峰或一般時段，並根據站點 (`stop`) 提供的
+ * 平均到達率 (`arrivalRateAvg`) 和標準差 (`arrivalRateSd`)
+ * 來產生一個符合常態分佈的隨機到達率。
+ * 
+ * @param time 當前時間（以秒為單位）
+ * @param stop 指向 `Stop` 物件的指標，用於獲取該站點的到達率
+ * @return double 計算出的隨機到達率，確保不小於 0
+ * 
+ * @note
+ * - 早上尖峰 (`morningPeak`) 的到達率使用 `stop->arrivalRate[0]`
+ * - 下午尖峰 (`eveningPeak`) 的到達率使用 `stop->arrivalRate[1]`
+ * - 離峰時間使用 `stop->arrivalRate[2]`
+ * - 使用 `std::normal_distribution` 來產生隨機變數
+ */
+    // 初始化隨機數生成器
+    random_device rd;
+    mt19937 gen(rd());
+
+    double arrivalRateAvg, arrivalRateSd;
+
+    // 根據當前時間選擇對應的到達率平均值與標準差
+    if (time >= this->morningPeak.first && time <= this->morningPeak.second) {
+        arrivalRateAvg = stop->arrivalRate[0].first;
+        arrivalRateSd = stop->arrivalRate[0].second;    
+    } else if (time >= this->eveningPeak.first && time <= this->eveningPeak.second) {
+        arrivalRateAvg = stop->arrivalRate[1].first;
+        arrivalRateSd = stop->arrivalRate[1].second;
+    } else {
+        arrivalRateAvg = stop->arrivalRate[2].first;
+        arrivalRateSd = stop->arrivalRate[2].second;
+    }
+
+    // 使用常態分佈來生成隨機到達率
+    normal_distribution<> dist(arrivalRateAvg, arrivalRateSd);
+
+    // 確保回傳值不小於 0
+    return max(0.0, dist(gen));
 }
 
-void System::arriveAtStop(Event* e) {
-    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
-        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
-        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
-    cout << "New Event: Bus " << e->getBusID() << " arrive at stop " << e->getStopID() << "\n";
+double System::getDropRate(int time, Stop* stop) {
+/**
+ * @brief 根據時間與站點的下車率計算公車的隨機下車率
+ * 
+ * 此函式會依據給定的時間 (`time`)，判斷當前時段屬於
+ * 早高峰、晚高峰或一般時段，並根據站點 (`stop`) 提供的
+ * 平均下車率 (`dropRateAvg`) 和標準差 (`dropRateSd`)
+ * 來產生一個符合常態分佈的隨機下車率。
+ * 
+ * @param time 當前時間（以秒為單位）
+ * @param stop 指向 `Stop` 物件的指標，用於獲取該站點的下車率
+ * @return double 計算出的隨機下車率，確保不小於 0
+ * 
+ * @note
+ * - 早上尖峰 (`morningPeak`) 的下車率使用 `stop->dropRate[0]`
+ * - 早上尖峰 (`eveningPeak`) 的下車率使用 `stop->dropRate[1]`
+ * - 離峰時間使用 `stop->dropRate[2]`
+ * - 使用 `std::normal_distribution` 來產生隨機變數
+ */
+    // 初始化隨機數生成器
+    random_device rd;
+    mt19937 gen(rd());
 
-    /*Get arrive rate and drop rate*/
-    float arriveRate = getOn[(e->getStopID())][0];
-    float dropRate = getOff[(e->getStopID())][0];
+    double dropRateAvg, dropRateSd;
 
-    int busID = e->getBusID();
-    Bus* bus = nullptr;
-    for (auto& b : fleet) {
-        if (b->getId() == busID) {
-            bus = b;
-            break;
+    // 根據當前時間選擇對應的下車率平均值與標準差
+    if (time >= this->morningPeak.first && time <= this->morningPeak.second) {
+        dropRateAvg = stop->dropRate[0].first;
+        dropRateSd = stop->dropRate[0].second;    
+    } else if (time >= this->eveningPeak.first && time <= this->eveningPeak.second) {
+        dropRateAvg = stop->dropRate[1].first;
+        dropRateSd = stop->dropRate[1].second;
+    } else {
+        dropRateAvg = stop->dropRate[2].first;
+        dropRateSd = stop->dropRate[2].second;
+    }
+
+    // 使用常態分佈來生成隨機下車率
+    normal_distribution<> dist(dropRateAvg, dropRateSd);
+
+    // 確保回傳值不小於 0
+    return max(0.0, dist(gen));
+}
+
+Bus* System::findBus(int id) {
+/**
+ * @brief 根據公車 ID 在車隊中尋找對應的公車物件
+ * 
+ * 此函式會遍歷 `fleet` 容器，尋找 `id` 相匹配的 `Bus` 物件，
+ * 若找到則回傳該 `Bus` 指標，否則拋出 `runtime_error` 異常。
+ * 
+ * @param id 要查找的公車 ID
+ * @return Bus* 指向對應 ID 的 `Bus` 物件指標
+ * 
+ * @throws runtime_error 若找不到對應 ID 的公車則拋出異常
+ * 
+ * @note
+ * - `fleet` 是一個 `vector<Bus*>`，存放所有公車的指標
+ * - 使用 `for (auto& b : this->fleet)` 來遍歷 `fleet`
+ * - 若找不到符合條件的公車，則拋出錯誤訊息
+ */
+    for (auto& b : this->fleet) {
+        if (b->getId() == id) {
+            return b;
         }
     }
     
-    if (!bus) {
-        cout << "Error: Bus not found for ID " << busID << endl;
-        return;
-    }
-    
-    int stopID = e->getStopID(); 
-    Stop* stop = nullptr;
+    throw runtime_error("找不到 id = " + to_string(id) + " 的公車\n");
+}
+
+Stop* System::findStop(int id) {
+/**
+ * @brief 根據站點 ID 在路線中尋找對應的站點物件
+ * 
+ * 此函式會遍歷 `route` 容器，嘗試尋找 `id` 相匹配的 `Stop` 物件，
+ * 若找到則回傳該 `Stop` 指標，若找不到則輸出錯誤訊息並拋出異常。
+ * 
+ * @param id 要查找的站點 ID
+ * @return Stop* 指向對應 ID 的 `Stop` 物件指標
+ * 
+ * @throws std::runtime_error 若找不到對應 ID 的站點則拋出異常
+ * 
+ * @note
+ * - `route` 是一個 `vector<variant<Stop*, Light*>>`，存放 `Stop*` 或 `Light*`
+ * - 使用 `find_if` 搭配 `get_if` 來判斷 `variant` 內的型別是否為 `Stop*`
+ */
+    // 使用 find_if 來搜尋符合條件的 Stop*
     auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-        if (auto* s = get_if<Stop*>(&item)) {
-            if ((*s)->id == stopID) {
-                stop = *s;
-                return true;
-            }
+        if (auto* s = get_if<Stop*>(&item)) { // 確認 item 是否為 Stop*
+            return (*s)->id == id;
         }
         return false;
     });
 
+    // 如果找到符合的站點，則回傳對應的 Stop*
     if (it != route.end()) {
-        stop = get<Stop*>(*it);
-    } else {
-        cout << "Error: Stop not found for ID " << stopID << endl;
-        return;
-    }
+        return get<Stop*>(*it);
+    } 
+    
+    // 若找不到則拋出異常
+    throw runtime_error("找不到 ID = " + to_string(id) + " 的站點");
+}
 
-    /*Update vol and location*/
-    bus->setVol(0);
-    bus->setLocation(stop->mileage);
-    sort(fleet.begin(), fleet.end(), [](Bus* a, Bus* b) {
-        return a->getLocation() > b->getLocation(); 
+Light* System::findSignal(int id) {
+/**
+ * @brief 根據站點 ID 在路線中尋找對應的號誌物件
+ * 
+ * 此函式會遍歷 `route` 容器，嘗試尋找 `id` 相匹配的 `Light` 物件，
+ * 若找到則回傳該 `Light` 指標，若找不到則輸出錯誤訊息並拋出異常。
+ * 
+ * @param id 要查找的站點 ID
+ * @return Light* 指向對應 ID 的 `Light` 物件指標
+ * 
+ * @throws std::runtime_error 若找不到對應 ID 的站點則拋出異常
+ * 
+ * @note
+ * - `route` 是一個 `vector<variant<Stop*, Light*>>`，存放 `Stop*` 或 `Light*`
+ * - 使用 `find_if` 搭配 `get_if` 來判斷 `variant` 內的型別是否為 `Light*`
+ */
+    // 使用 find_if 來搜尋符合條件的 Light*
+    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
+        if (auto* s = get_if<Light*>(&item)) { // 確認 item 是否為 Light*
+            return (*s)->id == id;
+        }
+        return false;
     });
 
-    cout << "mileage = " << bus->getLocation() << "\n"; 
+    // 如果找到符合的站點，則回傳對應的 Light*
+    if (it != route.end()) {
+        return get<Light*>(*it);
+    } 
+    
+    // 若找不到則拋出異常
+    throw runtime_error("找不到 ID = " + to_string(id) + " 的號誌");
+}
 
-    /*Deal with pax*/
-    int paxRemain;
-
-    int demand;
-    if (stop->lastArrive == -1) {
-        paxRemain = (static_cast<int>(bus->getHeadway() * dropRate) > bus->getPax()) ? 0 : (bus->getPax() - bus->getHeadway() * dropRate);
-        stop->pax += 300 * arriveRate;
-        demand = stop->pax;
-    } else {
-        paxRemain = (static_cast<int>(bus->getHeadway() * dropRate) > bus->getPax()) ? 0 : (bus->getPax() - bus->getHeadway() * dropRate);
-        stop->pax += static_cast<int>((e->getTime() - stop->lastArrive) * arriveRate);
-        demand = stop->pax; 
-    }
-
-    int availableCapacity = static_cast<int>(bus->getCapacity() - paxRemain);
+void System::handlingPax(Bus* bus, Stop* stop, double arrivalRate, double dropRate) {
+/**
+ * @brief 處理公車在停靠站時的乘客上下車過程
+ * 
+ * 根據到達率 (arrivalRate) 和下車率 (dropRate)，計算公車在停靠站時的乘客變動，並更新相關數值。
+ * 這個函式會處理以下幾個步驟：
+ * 1. 計算需要下車的乘客數量 (dropPax)。
+ * 2. 計算車上剩餘的乘客數量 (paxRemain)。
+ * 3. 計算停靠站需求 (demand) 和公車可用的剩餘容量 (availableCapacity)。
+ * 4. 根據需求和容量計算上車的乘客數量 (boardPax)。
+ * 5. 更新公車上的乘客數量 (setPax)，並減少停靠站的需求。
+ * 6. 更新公車的停留時間 (setDwell)，即根據上車乘客數量設定。
+ * 
+ * @param bus 當前處理的公車對象。
+ * @param stop 當前停靠的站點對象。
+ * @param arrivalRate 到達率。
+ * @param dropRate 下車率。
+ */
+    int paxRemain, dropPax, demand, availableCapacity, boardPax;
+    dropPax = min(bus->getPax(), static_cast<int>(bus->getHeadway() * dropRate));
+    paxRemain = bus->getPax() - dropPax;
+    demand = stop->pax;
+ 
+    availableCapacity = static_cast<int>(bus->getCapacity() - paxRemain);
     cout << "availableCapacity: " << availableCapacity << "\n";
 
     cout << "Demand: " << demand << "\n";
-    int boardPax = (demand > availableCapacity) ? availableCapacity : demand;
+    boardPax = (demand > availableCapacity) ? availableCapacity : demand;
     bus->setDwell(boardPax * 2);
 
     bus->setPax(paxRemain + boardPax);    
     stop->pax -= boardPax;
     cout << "Capacity: " << bus->getCapacity() << ", Current Passenger: " << bus->getPax() << ", Boarded Passenger: " << boardPax << endl;
+}
 
-    Bus* prevBus = nullptr;
-    for (auto it = fleet.begin(); it != fleet.end(); ++it) {
-        if ((*it)->getId() == busID) {
-            if (it != fleet.begin()) {
-                prevBus = *(it - 1); 
-            } else {
-                break;
-            }
-        }
-    }
+void System::sortedFleet() {
+/**
+ * @brief 根據公車的位置對車隊進行排序
+ * 
+ * 這個函式會根據每輛公車的地理位置 (`getLocation()`) 來對車隊 (`fleet`) 進行排序，
+ * 排序的順序是從大到小，也就是說，位置較靠前的公車會排在前面。
+ *
+ */
+    sort(fleet.begin(), fleet.end(), [](Bus* a, Bus* b) {
+        return a->getLocation() > b->getLocation(); 
+    });
+}
 
-    // Get distance from proceed bus
+void System::eventPerformance(Event* e, Stop* stop, Bus* bus) {
+/**
+ * @brief 處理公車事件的執行結果並計算與前一輛公車抵達的時間差異
+ * 
+ * 此函式會檢查當前公車 (bus) 相對於上一輛公車 (prevBus) 的行駛時間差，並根據這些資訊進行相應的輸出與統計。
+ * 它會顯示當前時間與上一輛公車的抵達時間之間的時間差，並計算偏差量。
+ * 同時更新停靠站的上一輛公車抵達時間。
+ * 
+ * @param e 公車事件 (Event)，包含當前事件的時間與相關資料
+ * @param stop 停靠站 (Stop)，儲存該站點的各項資訊，包括上一輛公車的抵達時間
+ * @param bus 公車 (Bus)，需要被檢查的公車，並計算與前一輛公車的抵達時間差
+ */
+    Bus* prevBus = this->findPrevBus(bus);
     if (prevBus) {
-        cout << "Time: " << e->getTime() << ", last arrive time: " << stop->lastArrive <<
-            ", scheduled headeay: " << bus->getHeadway() / 60 << " min\n";
+        cout << "Now: "; 
+        this->printFormattedTime(e->getTime());
+        cout << ", last arrive time: ";
+        this->printFormattedTime(stop->lastArrive); 
+        cout << ", scheduled headeay: " << bus->getHeadway() / 60 << " min\n";
         
         cout << "headway deviation: " << abs(static_cast<float>((e->getTime() - stop->lastArrive) - bus->getHeadway())) << " seconds\n";
         this->incrHeadwayDev(pow(static_cast<float>((e->getTime() - stop->lastArrive) - bus->getHeadway()) / static_cast<float>(bus->getHeadway()), 2)); //headway deviation
-        cout << "Cumulative headway deviation: " << headwayDev << "\n";
+        cout << "Cumulative headway deviation: " << this->headwayDev << "\n";
+    }
+    stop->lastArrive = e->getTime();
+}
+
+void System::arriveAtStop(Event* e) {
+    /* 事件說明 */
+    this->printEventDetails(e);
+
+    /* 取得事件元素 */
+    Bus* bus = this->findBus(e->getBusID());
+    Stop* stop = this->findStop(e->getStopID());
+    
+    /* 取得當前當站的到達率及下車率 */
+    double arrivalRate = this->getArrivalRate(e->getTime(), stop);
+    double dropRate = this->getDropRate(e->getTime(), stop);
+
+    /* 更新公車狀態 */
+    bus->setVol(0);
+    bus->setLocation(stop->mileage);
+    this->sortedFleet();
+
+    /* 更新站點狀態 */
+    if (stop->lastArrive >= 0) {
+        stop->pax += bus->getHeadway() * arrivalRate;
+    } else {
+        stop->pax += static_cast<int>((e->getTime() - stop->lastArrive) * arrivalRate);
     }
 
-    stop->lastArrive = e->getTime();
+    /* 處理乘客上下車 */
+    cout << "Processing Passengers alighting and boarding...\n";
+    this->handlingPax(bus, stop, arrivalRate, dropRate);
 
-    /*New event*/
+    /* 計算績效值 */
+    this->eventPerformance(e, stop, bus);
+
+    /* 建立新事件 */
     auto itor = route.find(stop);
     if (itor != route.end() && itor == prev(route.end())) {
-        cout << "Final stop in this route, terminate\n\n";
+        cout << "抵達終點站\n\n";
         return;   
     } else {
-        cout << "Going to next element ...\n";
+        cout << "繼續前往下一元素 ...\n";
         Event* newEvent = new Event( //depart form stop
             e->getTime() + min(this->getTmax(), bus->getDwell()), 
             bus->getId(),
@@ -449,44 +737,19 @@ void System::arriveAtStop(Event* e) {
 }
 
 void System::deptFromStop(Event* e) {
-    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
-        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
-        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
-    cout << "New Event: Bus " << e->getBusID() << " depart from stop " << e->getStopID() << "\n";
-    
+    /* 事件說明 */
+    this->printEventDetails(e);
 
-    int busID = e->getBusID();
-    Bus* bus = nullptr;
-    for (auto& b : fleet) {
-        if (b->getId() == busID) {
-            bus = b;
-            break;
-        }
-    }
-    
-    if (!bus) {
-        cout << "Error: Bus not found for ID " << busID << endl;
-        return;
-    }
-    
-    int stopID = e->getStopID(); 
-    Stop* stop = nullptr;
-    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-        if (auto* s = get_if<Stop*>(&item)) {
-            if ((*s)->id == stopID) {
-                stop = *s;
-                return true;
-            }
-        }
-        return false;
-    });
+    Bus* bus = this->findBus(e->getBusID());
+    Stop* stop = this->findStop(e->getStopID());
 
     /*Update bus status*/
     bus->setLastGo(e->getTime());
+    bus->setVol(bus->getNextVol());
     cout << "mileage = " << bus->getLocation() << "\n";
 
     //find next stop
-    auto nextStop = this->getNextStop(stopID);
+    auto nextStop = this->getNextStop(stop->id);
 
     /*Calculate scheme*/
     if (nextStop.has_value()) {
@@ -497,17 +760,8 @@ void System::deptFromStop(Event* e) {
         int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
         int totaldwell = paxTime + bus->getDwell();
         cout << "total dwell time = " << totaldwell << "\n";
-        
-        Bus* prevBus = nullptr;
-        for (auto it = fleet.begin(); it != fleet.end(); ++it) {
-            if ((*it)->getId() == busID) {
-                if (it != fleet.begin()) {
-                    prevBus = *(it - 1); 
-                } else {
-                    break;
-                }
-            }
-        }
+
+        Bus* prevBus = this->findPrevBus(bus);
     
         if (!prevBus) { //first car 
             cout << "The first bus should not follow other's volocity" << "\n";
@@ -628,43 +882,17 @@ void System::deptFromStop(Event* e) {
     } else {
         cout << "Can't find next element or no next\n";
     }
-    // cout << "!!!!!" << stop->pax << "!!!!\n";
     cout << "\n";
 }
 
 void System::arriveAtLight(Event* e) {
-    /*Announcement*/
-    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
-        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
-        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
-    cout << "Bus " << e->getBusID() << " arrive at light " << e->getLightID() << "\n";
+    /* 事件說明 */
+    this->printEventDetails(e);
 
     /*Find target*/
-    int busID = e->getBusID();
-    Bus* bus = nullptr;
-    for (auto& b : fleet) {
-        if (b->getId() == busID) {
-            bus = b;
-            break;
-        }
-    }
+    Bus* bus = this->findBus(e->getBusID());
+    Light* light = this->findSignal(e->getLightID());
     
-    if (!bus) {
-        cout << "Error: Bus not found for ID " << busID << endl;
-        return;
-    }
-    
-    int lightID = e->getLightID();
-    Light* light = nullptr;
-    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-        if (auto* s = get_if<Light*>(&item)) {
-            if ((*s)->id == lightID) {
-                light = *s;
-                return true;
-            }
-        }
-        return false;
-    });
     bus->setLocation(light->mileage);
     cout << "mileage = " << bus->getLocation() << "\n";
 
@@ -681,7 +909,7 @@ void System::arriveAtLight(Event* e) {
             e->getTime() + wait, 
             bus->getId(),
             4, 
-            lightID, 
+            light->id, 
             e->getDirection()
         );
         eventList.push(newEvent);
@@ -728,37 +956,10 @@ void System::arriveAtLight(Event* e) {
 
 void System::deptFromLight(Event* e) {
     /*Announcement*/
-    cout << "Time: " << std::setw(2) << std::setfill('0') << e->getTime() / 3600 << ":" <<
-        std::setw(2) << std::setfill('0') << (e->getTime() % 3600) / 60 << ":" << 
-        std::setw(2) << std::setfill('0') << e->getTime() % 60<< "\n";
-    cout << "Bus " << e->getBusID() << " dept form light " << e->getLightID() << "\n";
-
-    /*Find target*/
-    int busID = e->getBusID();
-    Bus* bus = nullptr;
-    for (auto& b : fleet) {
-        if (b->getId() == busID) {
-            bus = b;
-            break;
-        }
-    }
+    this->printEventDetails(e);
     
-    if (!bus) {
-        cout << "Error: Bus not found for ID " << busID << endl;
-        return;
-    }
-    
-    int lightID = e->getLightID();
-    Light* light = nullptr;
-    auto it = find_if(route.begin(), route.end(), [&](const variant<Stop*, Light*>& item) {
-        if (auto* s = get_if<Light*>(&item)) {
-            if ((*s)->id == lightID) {
-                light = *s;
-                return true;
-            }
-        }
-        return false;
-    });
+    Bus* bus = this->findBus(e->getBusID());
+    Light* light = this->findSignal(e->getLightID());
 
     /*Updat bus status*/
     bus->setLocation(light->mileage);
@@ -804,9 +1005,14 @@ void System::deptFromLight(Event* e) {
 
 
 void System::simulation() {
-
-    cout << fleet.size() << "\n";
-
+/**
+ * @brief 模擬系統事件處理流程
+ * 
+ * 這個函式會不斷從事件列表 (`eventList`) 取出最高優先級的事件，並根據事件類型執行相對應的處理函式。
+ * 當事件處理完後，該事件會從 `eventList` 移除，直到 `eventList` 為空，模擬才會結束。
+ * 
+ * @throws std::runtime_error 如果遇到未知的事件類型，則拋出異常。
+ */
     while(!eventList.empty()) {
         Event* currentEvent = eventList.top();
         int eventType = currentEvent->getEventType();
@@ -814,7 +1020,7 @@ void System::simulation() {
         if (it != eventSet.end()) {
             it->second(currentEvent);
         } else {
-            cout << "Unknown event type: " << eventType << endl;
+            throw runtime_error("未知的事件種類: " + to_string(eventType));
         }
         eventList.pop();
     }
@@ -823,17 +1029,17 @@ void System::simulation() {
 void System::performance() {
     cout << ">>> Performance <<<\n";
     cout << "There were " << fleet.size() << " bus run today.\n";
-    cout << "Each line consists of 31 stop.\n"; 
+    cout << "Each line consists of " << this->stopAmount << " stop.\n"; 
     cout << "Total heawdway deviation: " << this->headwayDev / 1;
     cout << "\nAvg headway deviation: " << this->headwayDev /(fleet.size() - 1);
 }
 
 void  System::showRoute() {
-     for (const auto& element : this->route) {
+    for (const auto& element : this->route) {
         visit([](auto&& obj) {
             using T = decay_t<decltype(obj)>;
             if constexpr (is_same_v<T, Stop*>) {
-                cout << "Stop ID: " << obj->id << endl;
+                cout << "Stop ID: " << obj->id << "\n";
             } else if constexpr (std::is_same_v<T, Light*>) {
                 cout << "Light ID: " << obj->id << endl;
             }

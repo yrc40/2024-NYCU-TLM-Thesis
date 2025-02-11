@@ -1,6 +1,8 @@
 [general]
 scheme = 1
 route = "307"
+morningPeak = "0700-0900"
+eveningPeak = "1700-1900"
 
 [stop]
 distAvg = 350
