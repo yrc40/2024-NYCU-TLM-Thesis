@@ -4,6 +4,13 @@
 #include <sstream>
 
 System::System() : route(mileageCmp()) {
+/**
+ * @brief 模擬系統建構子，初始化事件處理設置並開始模擬過程
+ * 
+ * 這個建構子會初始化模擬系統的基本設定，並自動設定每一種類型事件對應的處理函式（即事件集）。
+ * 它使用 `eventSet` 來映射事件類型與對應的事件處理函式，並且在初始化完成後開始模擬過程。
+ * 
+ */
     /* 初始化一個模擬系統時，自動設定 event set 的 mapping */
     eventSet[1] = [this](Event* e) { this->arriveAtStop(e); }; // 事件 1: 公車到站
     eventSet[2] = [this](Event* e) { this->deptFromStop(e); }; // 事件 2: 公車離站
@@ -177,7 +184,7 @@ void System::displayRoute() {
             using T = decay_t<decltype(obj)>;
             if constexpr (is_same_v<T, Stop*>) {
                 cout << "Stop ID: " << obj->id << endl;
-            } else if constexpr (std::is_same_v<T, Light*>) {
+            } else if constexpr (is_same_v<T, Light*>) {
                 cout << "Signal ID: " << obj->id << endl;
             }
         }, element);
@@ -223,61 +230,18 @@ void System::init() {
         this->scheSd.value() *= 60;
         this->setupSche(this->scheStart.value(), this->scheAvg.value(), this->scheSd.value(), this->shift.value());
 
+        /* 讀取速度相關參數 */
+        this->Vavg = config["velocity"]["avg"].value<double>();
+        this->Vsd = config["velocity"]["sd"].value<double>();
+        this->Vlimit = config["velocity"]["limit"].value<double>();
+        this->Vlow = config["velocity"]["low"].value<double>();
+
     } catch (const toml::parse_error& e) {
         cerr << "設定檔讀取錯誤：" << e.what() << "\n";
         exit(1);
     }
 
-    string line;
-
     this->displayRoute();
-
-    /*Read get on rate*/
-    ifstream file3("./data/getOn.csv");
-    getline(file3, line);
-    while (getline(file3, line)) {
-        
-        stringstream ss(line);
-        string field;
-        vector<float> item;
-
-        std::getline(ss, field, ',');
-        std::getline(ss, field, ',');
-        item.push_back(stof(field) / 3600); //18
-
-        std::getline(ss, field, ',');
-        item.push_back(stof(field) / 3600); // 19
-
-        std::getline(ss, field, ',');
-        item.push_back(stof(field) / 3600); //17
-
-        getOn.push_back(item);
-    }
-    file3.close();
-
-    /*Read get off rate*/
-    ifstream file4("./data/getOff.csv");
-    getline(file4, line);
-    while (getline(file4, line)) {
-        
-        stringstream ss(line);
-        string field;
-        vector<float> item;
-
-        std::getline(ss, field, ',');
-        std::getline(ss, field, ',');
-        item.push_back(stof(field) / 3600); //18
-
-        std::getline(ss, field, ',');
-        item.push_back(stof(field) / 3600); // 19
-
-        std::getline(ss, field, ',');
-        item.push_back(stof(field) / 3600); //17
-
-        getOff.push_back(item);
-    }
-    file4.close();
-
 
 }
 
@@ -610,7 +574,7 @@ Light* System::findSignal(int id) {
     throw runtime_error("找不到 ID = " + to_string(id) + " 的號誌");
 }
 
-void System::handlingPax(Bus* bus, Stop* stop, double arrivalRate, double dropRate) {
+int System::handlingPax(Bus* bus, Stop* stop, int time, double dropRate) {
 /**
  * @brief 處理公車在停靠站時的乘客上下車過程
  * 
@@ -627,9 +591,13 @@ void System::handlingPax(Bus* bus, Stop* stop, double arrivalRate, double dropRa
  * @param stop 當前停靠的站點對象。
  * @param arrivalRate 到達率。
  * @param dropRate 下車率。
+ *
+ * @return dwellTime 乘客上下車花費之時
+
  */
-    int paxRemain, dropPax, demand, availableCapacity, boardPax;
-    dropPax = min(bus->getPax(), static_cast<int>(bus->getHeadway() * dropRate));
+    int paxRemain, dropPax, demand, availableCapacity, boardPax, timePassed;
+    timePassed = (stop->lastArrive >=0) ? (time - stop->lastArrive) : bus->getHeadway();
+    dropPax = min(bus->getPax(), static_cast<int>(timePassed * dropRate));
     paxRemain = bus->getPax() - dropPax;
     demand = stop->pax;
  
@@ -638,11 +606,13 @@ void System::handlingPax(Bus* bus, Stop* stop, double arrivalRate, double dropRa
 
     cout << "Demand: " << demand << "\n";
     boardPax = (demand > availableCapacity) ? availableCapacity : demand;
-    bus->setDwell(boardPax * 2);
+    int dwellTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
 
     bus->setPax(paxRemain + boardPax);    
     stop->pax -= boardPax;
     cout << "Capacity: " << bus->getCapacity() << ", Current Passenger: " << bus->getPax() << ", Boarded Passenger: " << boardPax << endl;
+
+    return dwellTime;
 }
 
 void System::sortedFleet() {
@@ -694,8 +664,9 @@ void System::arriveAtStop(Event* e) {
     Stop* stop = this->findStop(e->getStopID());
     
     /* 取得當前當站的到達率及下車率 */
-    double arrivalRate = this->getArrivalRate(e->getTime(), stop);
-    double dropRate = this->getDropRate(e->getTime(), stop);
+    double arrivalRate, dropRate;
+    arrivalRate = stop->id ? bus->getArrivalRate() : this->getArrivalRate(e->getTime(), stop);
+    dropRate = stop->id ? bus->getDropRate() : this->getDropRate(e->getTime(), stop);
 
     /* 更新公車狀態 */
     bus->setVol(0);
@@ -711,7 +682,7 @@ void System::arriveAtStop(Event* e) {
 
     /* 處理乘客上下車 */
     cout << "Processing Passengers alighting and boarding...\n";
-    this->handlingPax(bus, stop, arrivalRate, dropRate);
+    int dwellTime = this->handlingPax(bus, stop, e->getTime(), dropRate);
 
     /* 計算績效值 */
     this->eventPerformance(e, stop, bus);
@@ -724,7 +695,7 @@ void System::arriveAtStop(Event* e) {
     } else {
         cout << "繼續前往下一元素 ...\n";
         Event* newEvent = new Event( //depart form stop
-            e->getTime() + min(this->getTmax(), bus->getDwell()), 
+            e->getTime() + min(this->getTmax(), max(bus->getDwell(), dwellTime)), 
             bus->getId(),
             2, 
             e->getStopID(), 
@@ -740,39 +711,54 @@ void System::deptFromStop(Event* e) {
     /* 事件說明 */
     this->printEventDetails(e);
 
-    Bus* bus = this->findBus(e->getBusID());
-    Stop* stop = this->findStop(e->getStopID());
+    /* 取得事件所需之元素 */
+    auto bus = this->findBus(e->getBusID());
+    auto stop = this->findStop(e->getStopID());
 
-    /*Update bus status*/
+    /* 取得當前當站的到達率及下車率 */
+    auto arrivalRate = bus->getArrivalRate();
+    bus->setArrivalRate(arrivalRate);
+    auto dropRate = bus->getDropRate();
+    bus->setDropRate(dropRate);
+
+    /* 取得平均速度分佈與上下限 */
+    random_device rd;
+    mt19937 gen(rd());
+    normal_distribution<> dist(this->Vavg.value(), this->Vsd.value());
+    double Vavg = max(0.0, dist(gen)) / 3.6;
+    double Vlimit = this->Vlimit.value() / 3.6;
+    double Vlow = this->Vlow.value() / 3.6;
+
+    /* 更新公車狀態 */
     bus->setLastGo(e->getTime());
-    bus->setVol(bus->getNextVol());
-    cout << "mileage = " << bus->getLocation() << "\n";
 
-    //find next stop
+    /* 計算行駛速度(策略一：置站優先) */
     auto nextStop = this->getNextStop(stop->id);
-
-    /*Calculate scheme*/
     if (nextStop.has_value()) {
-        float arriveRate = getOn[(nextStop.value()->id)][0];
-        float dropRate = getOff[(nextStop.value()->id)][0];
         cout << "Next stop is: " << nextStop.value()->id << " " << nextStop.value()->stopName << "\n";
-        int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arriveRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
+        int boardPax = min(nextStop.value()->pax + static_cast<int>(ceil(bus->getHeadway()*arrivalRate)), static_cast<int>(bus->getCapacity() - (bus->getPax() * dropRate))); //pax num
         int paxTime = static_cast<int>(boardPax * (bus->getPax() < 0.65 * bus->getCapacity() ? 2 : 2.7));
         int totaldwell = paxTime + bus->getDwell();
         cout << "total dwell time = " << totaldwell << "\n";
 
         Bus* prevBus = this->findPrevBus(bus);
-    
         if (!prevBus) { //first car 
             cout << "The first bus should not follow other's volocity" << "\n";
             bus->setVol(Vavg);
             bus->setDwell(totaldwell);
             cout << "vol = " << bus->getVol() * 3.6 << " kph, dwell time = " << bus->getDwell() << "\n";
 
-        } else if (prevBus->getVol()) {
-            float distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
-            float newVol = distance / (bus->getHeadway() + totaldwell);
-            if ((distance / Vavg) < bus->getHeadway() * 0.75) { // || (distance / Vavg) > bus->getHeadway() * 1.5
+        } else {
+            double distance, newVol;
+            if (prevBus->getVol()) {
+                distance = prevBus->getLocation() + prevBus->getVol() * (e->getTime() - prevBus->getLastGo()) - stop->mileage;
+                newVol = distance / (bus->getHeadway() + totaldwell);
+            } else {
+                distance = prevBus->getLocation() - stop->mileage;
+                newVol = distance / (bus->getHeadway() + totaldwell);
+            }
+        
+            if ((distance / Vavg) < bus->getHeadway() * 0.75) {
                 newVol = Vavg;
                 if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
                 bus->bunching = make_pair(stop->id, 0);
@@ -805,50 +791,11 @@ void System::deptFromStop(Event* e) {
             bus->setDwell(totaldwell);
             cout << "distance = " << distance << " new Vol = " << newVol * 3.6 << " kph\n";
 
-        } else {
-            float distance = prevBus->getLocation() - stop->mileage;
-            float newVol = distance / (bus->getHeadway() + totaldwell);
-
-            if ((distance / Vavg) < bus->getHeadway() * 0.75 ) { //|| (distance / Vavg) > bus->getHeadway() * 1.5)
-                //cout << "Yes it's too far\n";
-                newVol = Vavg;
-                if (bus->bunching.second) cout << "recovered the bunching problem successfully in " << stop->id - bus->bunching.first << "stops.\n";
-                bus->bunching = make_pair(stop->id, 0);
-                cout << "No bunching, just run with avg speed.\n";
-            } else {
-                 //cout << "Yes it's too close\n";
-                bus->bunching = make_pair(stop->id, 1);
-                cout << "There's might be bus bunching, use the given scheme\n";
-            }
-
-            if(newVol < Vlow) {
-                cout << "Yes it's too close\n";
-                cout << newVol << "\n";
-                cout << "distance: " << distance << "\n";
-                cout << "paxTime: " << paxTime << "\n";
-                cout << "totalDwell: " << totaldwell << "\n";
-                totaldwell += (distance / newVol) - (distance / Vavg);
-                newVol = Vavg;
-                bus->setVol(newVol);
-                bus->setDwell(totaldwell);
-            } else if (newVol > Vlimit) {
-                cout << "Yes it's too far\n";
-                cout << "distance: " << distance << "\n";
-                cout << "paxTime: " << paxTime << "\n";
-                cout << "totalDwell: " << totaldwell << "\n";
-                cout << "hdwy: " << bus->getHeadway() << "\n";
-                prevBus->setDwell(prevBus->getDwell() + (distance / Vlimit) - (distance / newVol));
-                newVol = Vlimit;
-            }
-
-            bus->setVol(newVol);
-            bus->setDwell(totaldwell);
-            cout << "distance = " << distance << " new Vol = " << newVol * 3.6 << " kph\n";
-        }
+        } 
     }
 
-    /*Find next event*/
-    if (stop->id == this->stopAmount) return;
+    /* 產生新事件 */
+    if (stop->id == this->stopAmount - 1) return;
     auto nextElement = findNext(stop);
     if(nextElement.has_value()) {
         visit([&](auto* obj) {
@@ -864,7 +811,6 @@ void System::deptFromStop(Event* e) {
                     e->getDirection()
                 );
                 eventList.push(newEvent);
-
             } else if constexpr (is_same_v<T, Light>) {
                 cout << "Next Light ID: " << obj->id << endl;
                 int dist = obj->mileage - stop->mileage;
@@ -880,7 +826,7 @@ void System::deptFromStop(Event* e) {
             }
         }, nextElement.value());
     } else {
-        cout << "Can't find next element or no next\n";
+        throw runtime_error("找不到路線中下一個元素");
     }
     cout << "\n";
 }

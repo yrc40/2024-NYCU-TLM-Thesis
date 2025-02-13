@@ -17,10 +17,15 @@ class Bus {
         int getPax(); // 取得公車當前乘客數
         int getLocation(); // 取得公車當前位置 (里程)
         int getDwell(); // 取得公車之設計置站時間
+        int getStopDwell();
         int getLastGo(); // 取得公車上一次駛離站點或號誌的時間
         const int getCapacity(); // 取得公車容量
         const int getHeadway(); // 取得公車與上一班車的發車間距
         double getNextVol();
+        int getDropPax();
+        int getDemand();
+        double getArrivalRate();
+        double getDropRate();
 
         /* Setter */
         void setVol(double v); // 設定速度
@@ -29,6 +34,11 @@ class Bus {
         void setDwell(int d); // 設定置站時間
         void setLastGo(int t); // 設定上一次駛離站點或號誌的時間
         void setNextVol(double v);
+        void setStopDwell(int d);
+        void setDropPax(int p);
+        void setDemand(int p);
+        void setArrivalRate(double a);
+        void setDropRate(double d);
 
         pair<int, bool> bunching = {0, 0}; // 連班記錄變數 { 第幾站, 連班與否 }
 
@@ -40,8 +50,13 @@ class Bus {
         int pax = 0; // 車上乘客
         int location = 0; // 位置
         int dwell = 0; // 累積置站時間
+        int stopDwell = 0;
         int headway; // 發車間距
         int lastGo = 0; // 上一次駛離站點或號誌的時間
+        int dropPax = 0;
+        int demand = 0;
+        double arrivalRate = 0;
+        double dropRate = 0;
 };
 
 #endif

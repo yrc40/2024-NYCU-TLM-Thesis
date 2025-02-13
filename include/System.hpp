@@ -73,10 +73,10 @@ class System {
         /*Paramemter*/
         string routeName; // 路線名稱
         int Tmax = 3 * 60; // 最大置站時間 (秒)
-        double Vavg = 25 / 3.6; // 平均速度
-        double Vsd =  7 / 3.6;
-        double Vlimit = 40 / 3.6; // 速限
-        double Vlow = 15 / 3.6; // 最低容許速度
+        //double Vavg = 25 / 3.6; // 平均速度
+        //double Vsd =  7 / 3.6;
+        //double Vlimit = 40 / 3.6; // 速限
+        //double Vlow = 15 / 3.6; // 最低容許速度
         int stopAmount;
         optional<double> stopDistAvg;
         optional<double> stopDistSd;
@@ -88,6 +88,11 @@ class System {
         optional<double> scheSd;
         pair<int, int> morningPeak;
         pair<int, int> eveningPeak;
+        optional<double> Vavg;
+        optional<double> Vsd;
+        optional<double> Vlimit;
+        optional<double> Vlow;
+        
 
         /*Variable*/
         float headwayDev = 0; // 績效值: headeay deviation
@@ -119,7 +124,7 @@ class System {
         Bus* findBus(int id);
         Stop* findStop(int id);
         Light* findSignal(int id);
-        void handlingPax(Bus* bus, Stop* stop, double arr, double drop);
+        int handlingPax(Bus* bus, Stop* stop, int time, double drop);
         void sortedFleet();
         void eventPerformance(Event* e, Stop* stop, Bus* bus);  
 
