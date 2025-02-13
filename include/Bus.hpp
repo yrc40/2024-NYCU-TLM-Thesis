@@ -22,8 +22,6 @@ class Bus {
         const int getCapacity(); // 取得公車容量
         const int getHeadway(); // 取得公車與上一班車的發車間距
         double getNextVol();
-        int getDropPax();
-        int getDemand();
         double getArrivalRate();
         double getDropRate();
 
@@ -35,8 +33,6 @@ class Bus {
         void setLastGo(int t); // 設定上一次駛離站點或號誌的時間
         void setNextVol(double v);
         void setStopDwell(int d);
-        void setDropPax(int p);
-        void setDemand(int p);
         void setArrivalRate(double a);
         void setDropRate(double d);
 
@@ -53,8 +49,6 @@ class Bus {
         int stopDwell = 0;
         int headway; // 發車間距
         int lastGo = 0; // 上一次駛離站點或號誌的時間
-        int dropPax = 0;
-        int demand = 0;
         double arrivalRate = 0;
         double dropRate = 0;
 };
