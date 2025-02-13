@@ -25,4 +25,8 @@ sd = 7
 limit = 40
 low = 15
 
+[time]
+Tmax = 180
+schemeThreshold = 0.75
+
 

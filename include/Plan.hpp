@@ -8,6 +8,8 @@ class Plan {
     public:
         Plan();
         void setPhase(string config);
+        int calculateSignal(int time);
+        int timeRemain(int index, int target);
         
     private:
         vector<int> time;
